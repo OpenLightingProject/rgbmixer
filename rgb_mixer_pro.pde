@@ -31,20 +31,14 @@
  *   Initial Release.
  */
 
+#include "UsbProReceiver.h"
+#include "UsbProSender.h"
+
 // Pin constants
 const byte LED_PIN = 13;
 const byte IDENTIFY_LED_PIN = 12;
 const byte PWM_PINS[] = {3, 5, 6, 9, 10, 11};
 
-// The receiving state
-typedef enum {
-  PRE_SOM = 0,
-  GOT_SOM = 1,
-  GOT_LABEL = 2,
-  GOT_DATA_LSB = 3,
-  IN_DATA = 4,
-  WAITING_FOR_EOM = 5,
-} recieving_state;
 
 // Use this to set the 'serial' number for the device.
 // This is used by OLA to store patching information.
@@ -184,26 +178,19 @@ typedef enum {
 // RDM globals
 unsigned int current_checksum;
 
-recieving_state recv_mode = PRE_SOM;
-byte label = 0;
-unsigned short expected_size = 0;
-unsigned short data_offset = 0;
-byte msg[600];
 byte led_state = LOW;  // flash the led when we get data.
 
 int dmx_start_address = 1;
 bool identify_mode_enabled = false;
 
 
-void DoRead();
-void TakeAction();
-void WriteMessage(byte label, int size, byte data[]);
+void TakeAction(byte label, byte *message, unsigned int message_size);
 void SetPWM(byte data[], unsigned int size);
 void HandleRDMMessage(byte *message, int size);
-void SendMessageHeader(byte label, int size);
-void SendMessageFooter();
 void SendManufacturerResponse();
 void SendDeviceResponse();
+
+UsbProSender sender;
 
 
 void setup() {
@@ -219,79 +206,33 @@ void setup() {
 
 
 void loop() {
-  while (Serial.available()) {
-    DoRead();
-  }
-}
-
-
-/*
- * Read bytes from host
- */
-void DoRead() {
-  byte data = Serial.read();
-  switch (recv_mode) {
-    case PRE_SOM:
-      if (data == 0x7E) {
-        recv_mode = GOT_SOM;
-      }
-      return;
-    case GOT_SOM:
-      label = data;
-      recv_mode = GOT_LABEL;
-      return;
-    case GOT_LABEL:
-      data_offset = 0;
-      expected_size = data;
-      recv_mode = GOT_DATA_LSB;
-      return;
-    case GOT_DATA_LSB:
-      expected_size += (data << 8);
-      if (expected_size == 0) {
-        recv_mode = WAITING_FOR_EOM;
-      } else {
-        recv_mode = IN_DATA;
-      }
-      return;
-    case IN_DATA:
-      msg[data_offset] = data;
-      data_offset++;
-      if (data_offset == expected_size) {
-        recv_mode = WAITING_FOR_EOM;
-      }
-      return;
-    case WAITING_FOR_EOM:
-      if (data == 0xE7) {
-        // this was a valid packet, act on it
-        TakeAction();
-      }
-      recv_mode = PRE_SOM;
-  }
+  UsbProReceiver receiver(TakeAction);
+  receiver.Read();
 }
 
 
 /*
  * Called when a full message is recieved from the host
  */
-void TakeAction() {
+void TakeAction(byte label, byte *message, unsigned int message_size) {
   switch (label) {
     case 3:
       // Widget Parameters request
-      WriteMessage(3, 5, DEVICE_PARAMS);
+      sender.WriteMessage(3, 5, DEVICE_PARAMS);
       break;
     case 6:
       // Dmx Data
-      if (msg[0] == 0) {
+      if (message[0] == 0) {
         // 0 start code
         led_state = ! led_state;
         digitalWrite(LED_PIN, led_state);
-        SetPWM(&msg[1], expected_size);
+        SetPWM(&message[1], message_size);
        }
       break;
     case SERIAL_NUMBER_MESSAGE:
-      WriteMessage(SERIAL_NUMBER_MESSAGE,
-                   sizeof(SERIAL_NUMBER),
-                   SERIAL_NUMBER);
+      sender.WriteMessage(SERIAL_NUMBER_MESSAGE,
+                          sizeof(SERIAL_NUMBER),
+                          SERIAL_NUMBER);
       break;
     case NAME_MESSAGE:
       SendDeviceResponse();
@@ -300,58 +241,27 @@ void TakeAction() {
       SendManufacturerResponse();
       break;
      case RDM_MESSAGE:
-      HandleRDMMessage(msg, expected_size);
+      HandleRDMMessage(message, message_size);
       break;
   }
 }
 
 
-/*
- * Send a message to the host
- * @param label the message label
- * @param size the length of the data
- * @param data the data buffer
- */
-void WriteMessage(byte label, int size, byte data[]) {
-  SendMessageHeader(label, size);
-  Serial.write(data, size);
-  SendMessageFooter();
-}
-
-
 void SendDeviceResponse() {
-  SendMessageHeader(NAME_MESSAGE,
-                    sizeof(DEVICE_ID) + sizeof(DEVICE_NAME));
+  sender.SendMessageHeader(NAME_MESSAGE,
+                           sizeof(DEVICE_ID) + sizeof(DEVICE_NAME));
   Serial.write(DEVICE_ID, sizeof(DEVICE_ID));
   Serial.write((byte*) DEVICE_NAME, sizeof(DEVICE_NAME));
-  SendMessageFooter();
+  sender.SendMessageFooter();
 }
 
 
 void SendManufacturerResponse() {
-  SendMessageHeader(MANUFACTURER_MESSAGE,
-                    sizeof(ESTA_ID) + sizeof(MANUFACTURER_NAME));
+  sender.SendMessageHeader(MANUFACTURER_MESSAGE,
+                           sizeof(ESTA_ID) + sizeof(MANUFACTURER_NAME));
   Serial.write(ESTA_ID, sizeof(ESTA_ID));
   Serial.write((byte*) MANUFACTURER_NAME, sizeof(MANUFACTURER_NAME));
-  SendMessageFooter();
-}
-
-
-/**
- * Sends the message header
- */
-void SendMessageHeader(byte label, int size) {
-  Serial.write(0x7E);
-  Serial.write(label);
-  Serial.write(size);
-  Serial.write(size >> 8);
-}
-
-/**
- * Sends the message footer
- */
-void SendMessageFooter() {
-  Serial.write(0xE7);
+  sender.SendMessageFooter();
 }
 
 
@@ -386,9 +296,9 @@ bool VerifyChecksum(byte *message, int size) {
 
 
 void ReturnRDMErrorResponse(byte error_code) {
-  SendMessageHeader(RDM_MESSAGE, 1);
+  sender.SendMessageHeader(RDM_MESSAGE, 1);
   Serial.write(error_code);
-  SendMessageFooter();
+  sender.SendMessageFooter();
 }
 
 
@@ -416,8 +326,8 @@ void StartRDMResponse(byte *received_message,
   // set the global checksum to 0
   current_checksum = 0;
   // size is the rdm status code, the rdm header + the param_data_size
-  SendMessageHeader(RDM_MESSAGE,
-                    1 + MINIMUM_RDM_PACKET_SIZE + param_data_size);
+  sender.SendMessageHeader(RDM_MESSAGE,
+                           1 + MINIMUM_RDM_PACKET_SIZE + param_data_size);
   SendByteAndChecksum(RDM_STATUS_OK);
   SendByteAndChecksum(START_CODE);
   SendByteAndChecksum(SUB_START_CODE);
@@ -464,7 +374,7 @@ void StartRDMResponse(byte *received_message,
 void EndRDMResponse() {
   Serial.write(current_checksum >> 8);
   Serial.write(current_checksum);
-  SendMessageFooter();
+  sender.SendMessageFooter();
 }
 
 

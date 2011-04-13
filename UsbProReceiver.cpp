@@ -64,7 +64,7 @@ void UsbProReceiver::Read() {
       case WAITING_FOR_EOM:
         if (data == 0xE7) {
           // this was a valid packet, act on it
-          TakeAction(label, message, expected_size);
+          m_callback(label, message, expected_size);
         }
         recv_mode = PRE_SOM;
     }

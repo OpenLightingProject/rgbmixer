@@ -18,6 +18,8 @@
  * A class which unpacks messages in the Usb Pro format.
  */
 
+#include "WProgram.h"
+
 #ifndef USBPRO_RECEIVER_H_
 #define USBPRO_RECEIVER_H_
 

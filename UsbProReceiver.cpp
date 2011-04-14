@@ -29,23 +29,25 @@ void UsbProReceiver::Read() {
   unsigned short data_offset = 0;
   byte message[600];
 
-  while (Serial.available()) {
+  while (true) {
+    while (!Serial.available()) {}
+
     byte data = Serial.read();
     switch (recv_mode) {
       case PRE_SOM:
         if (data == 0x7E) {
           recv_mode = GOT_SOM;
         }
-        return;
+        break;
       case GOT_SOM:
         label = data;
         recv_mode = GOT_LABEL;
-        return;
+        break;
       case GOT_LABEL:
         data_offset = 0;
         expected_size = data;
         recv_mode = GOT_DATA_LSB;
-        return;
+        break;
       case GOT_DATA_LSB:
         expected_size += (data << 8);
         if (expected_size == 0) {
@@ -53,14 +55,14 @@ void UsbProReceiver::Read() {
         } else {
           recv_mode = IN_DATA;
         }
-        return;
+        break;
       case IN_DATA:
         message[data_offset] = data;
         data_offset++;
         if (data_offset == expected_size) {
           recv_mode = WAITING_FOR_EOM;
         }
-        return;
+        break;
       case WAITING_FOR_EOM:
         if (data == 0xE7) {
           // this was a valid packet, act on it

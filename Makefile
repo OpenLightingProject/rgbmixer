@@ -41,6 +41,7 @@ UPLOAD_RATE = 57600
 AVRDUDE_PROGRAMMER = stk500
 MCU = atmega328p
 F_CPU = 16000000
+SOURCES = UsbProReceiver.cpp UsbProSender.cpp
 
 ############################################################################
 # Below here nothing should be changed...
@@ -95,7 +96,7 @@ LDFLAGS = -lm
 
 # Programming support using avrdude. Settings and variables.
 AVRDUDE_PORT = $(PORT)
-AVRDUDE_WRITE_FLASH = -U flash:w:applet/$(TARGET).hex
+AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
 AVRDUDE_FLAGS = -V -F -C $(AVRDUDE_PATH)/etc/avrdude.conf \
 -p $(MCU) -P $(AVRDUDE_PORT) -c $(AVRDUDE_PROGRAMMER) \
 -b $(UPLOAD_RATE)
@@ -137,33 +138,32 @@ build: elf hex
 # Then the .cpp file will be compiled. Errors during compile will
 # refer to this new, automatically generated, file.
 # Not the original .pde file you actually edit...
-applet/$(TARGET).cpp: $(TARGET).pde
-	test -d applet || mkdir applet
-	echo '#include "WProgram.h"' > applet/$(TARGET).cpp
-	echo 'extern "C" void __cxa_pure_virtual() {}' >> applet/$(TARGET).cpp
-	cat $(TARGET).pde >> applet/$(TARGET).cpp
-	cat $(ARDUINO)/main.cpp >> applet/$(TARGET).cpp
+$(TARGET).cpp: $(TARGET).pde
+	echo '#include "WProgram.h"' > $(TARGET).cpp
+	echo 'extern "C" void __cxa_pure_virtual() {}' >> $(TARGET).cpp
+	cat $(TARGET).pde >> $(TARGET).cpp
+	cat $(ARDUINO)/main.cpp >> $(TARGET).cpp
 
-elf: applet/$(TARGET).elf
-hex: applet/$(TARGET).hex
-eep: applet/$(TARGET).eep
-lss: applet/$(TARGET).lss
-sym: applet/$(TARGET).sym
+elf: $(TARGET).elf
+hex: $(TARGET).hex
+eep: $(TARGET).eep
+lss: $(TARGET).lss
+sym: $(TARGET).sym
 
 # Program the device.
-upload: applet/$(TARGET).hex
+upload: $(TARGET).hex
 	pulsedtr.py $(PORT)
 	$(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_WRITE_FLASH)
 
 
 # Display size of file.
-HEXSIZE = $(SIZE) --target=$(FORMAT) applet/$(TARGET).hex
-ELFSIZE = $(SIZE)  applet/$(TARGET).elf
+HEXSIZE = $(SIZE) --target=$(FORMAT) $(TARGET).hex
+ELFSIZE = $(SIZE)  $(TARGET).elf
 sizebefore:
-	@if [ -f applet/$(TARGET).elf ]; then echo; echo $(MSG_SIZE_BEFORE); $(HEXSIZE); echo; fi
+	@if [ -f $(TARGET).elf ]; then echo; $(HEXSIZE); echo; fi
 
 sizeafter:
-	@if [ -f applet/$(TARGET).elf ]; then echo; echo $(MSG_SIZE_AFTER); $(HEXSIZE); echo; fi
+	@if [ -f $(TARGET).elf ]; then echo; $(HEXSIZE); echo; fi
 
 
 # Convert ELF to COFF for use in debugging / simulating in AVR Studio or VMLAB.
@@ -174,12 +174,12 @@ COFFCONVERT=$(OBJCOPY) --debugging \
 --change-section-address .eeprom-0x810000
 
 
-coff: applet/$(TARGET).elf
-	$(COFFCONVERT) -O coff-avr applet/$(TARGET).elf $(TARGET).cof
+coff: $(TARGET).elf
+	$(COFFCONVERT) -O coff-avr $(TARGET).elf $(TARGET).cof
 
 
 extcoff: $(TARGET).elf
-	$(COFFCONVERT) -O coff-ext-avr applet/$(TARGET).elf $(TARGET).cof
+	$(COFFCONVERT) -O coff-ext-avr $(TARGET).elf $(TARGET).cof
 
 
 .SUFFIXES: .elf .hex .eep .lss .sym
@@ -200,11 +200,11 @@ extcoff: $(TARGET).elf
 	$(NM) -n $< > $@
 
 # Link: create ELF output file from library.
-applet/$(TARGET).elf: applet/$(TARGET).cpp applet/core.a
-	$(CC) $(ALL_CFLAGS) -o $@ applet/$(TARGET).cpp -L. applet/core.a $(LDFLAGS)
+$(TARGET).elf: $(TARGET).cpp $(SOURCES) core.a
+	$(CC) $(ALL_CFLAGS) -o $@ $(TARGET).cpp $(SOURCES) -L. core.a $(LDFLAGS)
 
-applet/core.a: $(OBJ)
-	@for i in $(OBJ); do echo $(AR) rcs applet/core.a $$i; $(AR) rcs applet/core.a $$i; done
+core.a: $(OBJ)
+	@for i in $(OBJ); do echo $(AR) rcs core.a $$i; $(AR) rcs core.a $$i; done
 
 
 
@@ -229,8 +229,8 @@ applet/core.a: $(OBJ)
 
 # Target: clean project.
 clean:
-	$(REMOVE) applet/$(TARGET).hex applet/$(TARGET).eep applet/$(TARGET).cof applet/$(TARGET).elf \
-	applet/$(TARGET).map applet/$(TARGET).sym applet/$(TARGET).lss applet/core.a \
+	$(REMOVE) $(TARGET).hex $(TARGET).eep $(TARGET).cof $(TARGET).elf \
+	$(TARGET).map $(TARGET).sym $(TARGET).lss core.a \
 	$(OBJ) $(LST) $(SRC:.c=.s) $(SRC:.c=.d) $(CXXSRC:.cpp=.s) $(CXXSRC:.cpp=.d)
 
 depend:

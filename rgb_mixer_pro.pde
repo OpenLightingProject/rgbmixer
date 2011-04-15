@@ -33,6 +33,7 @@
 
 #include "UsbProReceiver.h"
 #include "UsbProSender.h"
+#include "WidgetSettings.h"
 #include "RDMEnums.h"
 
 // Pin constants
@@ -41,11 +42,6 @@ const byte IDENTIFY_LED_PIN = 12;
 const byte PWM_PINS[] = {3, 5, 6, 9, 10, 11};
 
 
-// Use this to set the 'serial' number for the device.
-// This is used by OLA to store patching information.
-// TODO(simon): Set this with dip switches?
-byte ESTA_ID[] = "pz";
-byte SERIAL_NUMBER[] = {0, 0, 0, 1};
 byte DEVICE_PARAMS[] = {0, 1, 0, 0, 40};
 byte DEVICE_ID[] = {1, 0};
 char DEVICE_NAME[] = "Arduino RGB Mixer";
@@ -70,7 +66,6 @@ unsigned int current_checksum;
 
 byte led_state = LOW;  // flash the led when we get data.
 
-int dmx_start_address = 1;
 bool identify_mode_enabled = false;
 
 void TakeAction(byte label, byte *message, unsigned int message_size);
@@ -78,6 +73,7 @@ void SetPWM(byte data[], unsigned int size);
 void HandleRDMMessage(byte *message, int size);
 void SendManufacturerResponse();
 void SendDeviceResponse();
+void SendSerialNumberResponse();
 
 UsbProSender sender;
 
@@ -89,6 +85,8 @@ void setup() {
   pinMode(IDENTIFY_LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, led_state);
   digitalWrite(IDENTIFY_LED_PIN, identify_mode_enabled);
+
+  WidgetSettings.Init();
 }
 
 
@@ -119,9 +117,7 @@ void TakeAction(byte label, byte *message, unsigned int message_size) {
        }
       break;
     case SERIAL_NUMBER_LABEL:
-      sender.WriteMessage(SERIAL_NUMBER_LABEL,
-                          sizeof(SERIAL_NUMBER),
-                          SERIAL_NUMBER);
+      SendSerialNumberResponse();
       break;
     case NAME_LABEL:
       SendDeviceResponse();
@@ -136,6 +132,13 @@ void TakeAction(byte label, byte *message, unsigned int message_size) {
 }
 
 
+void SendSerialNumberResponse() {
+  long serial = WidgetSettings.SerialNumber();
+  sender.SendMessageHeader(SERIAL_NUMBER_LABEL, sizeof(serial));
+  sender.Write((byte*) &serial, sizeof(serial));
+  sender.SendMessageFooter();
+}
+
 void SendDeviceResponse() {
   sender.SendMessageHeader(NAME_LABEL,
                            sizeof(DEVICE_ID) + sizeof(DEVICE_NAME));
@@ -146,9 +149,12 @@ void SendDeviceResponse() {
 
 
 void SendManufacturerResponse() {
+  int esta_id = WidgetSettings.EstaId();
   sender.SendMessageHeader(MANUFACTURER_LABEL,
-                           sizeof(ESTA_ID) + sizeof(MANUFACTURER_NAME));
-  sender.Write(ESTA_ID, sizeof(ESTA_ID));
+                           sizeof(esta_id) + sizeof(MANUFACTURER_NAME));
+  // ESTA ID is sent in little endian format
+  sender.Write(esta_id);
+  sender.Write(esta_id >> 8);
   sender.Write((byte*) MANUFACTURER_NAME, sizeof(MANUFACTURER_NAME));
   sender.SendMessageFooter();
 }
@@ -230,13 +236,9 @@ void StartRDMResponse(byte *received_message,
   SendByteAndChecksum(received_message[13]);
   SendByteAndChecksum(received_message[14]);
 
-  // add our UID as the src, the ESTA_ID & SERIAL_NUMBER fields are reversed
-  SendByteAndChecksum(ESTA_ID[1]);
-  SendByteAndChecksum(ESTA_ID[0]);
-  SendByteAndChecksum(SERIAL_NUMBER[3]);
-  SendByteAndChecksum(SERIAL_NUMBER[2]);
-  SendByteAndChecksum(SERIAL_NUMBER[1]);
-  SendByteAndChecksum(SERIAL_NUMBER[0]);
+  // add our UID as the src, the ESTA_ID & fields are reversed
+  SendIntAndChecksum(WidgetSettings.EstaId());
+  SendLongAndChecksum(WidgetSettings.SerialNumber());
 
   SendByteAndChecksum(received_message[15]);  // transaction #
   SendByteAndChecksum(response_type);  // response type
@@ -498,14 +500,13 @@ void HandleRDMMessage(byte *message, int size) {
     is_broadcast &= (message[i] == 0xff);
   }
 
-  // the serial number & esta id we store is inverted
+  int expected_esta_id = message[3];
+  expected_esta_id  = expected_esta_id << 8;
+  expected_esta_id += message[4];
+
   bool to_us = is_broadcast || (
-    message[3] == ESTA_ID[1] &&
-    message[4] == ESTA_ID[0] &&
-    message[5] == SERIAL_NUMBER[3] &&
-    message[6] == SERIAL_NUMBER[2] &&
-    message[7] == SERIAL_NUMBER[1] &&
-    message[8] == SERIAL_NUMBER[0]);
+    WidgetSettings.MatchesEstaId(message + 3) &&
+    WidgetSettings.MatchesSerialNumber(message + 5));
 
   if (!to_us) {
     ReturnRDMErrorResponse(RDM_STATUS_INVALID_DESTINATION);

@@ -28,9 +28,8 @@
  */
 class UsbProReceiver {
   public:
-    UsbProReceiver(
-      void (*callback)(byte label, byte *message, unsigned int size)):
-        m_callback(callback) {}
+    UsbProReceiver(void (*callback)(byte label, byte *message,
+                   unsigned int size));
     void Read();
 
   private:

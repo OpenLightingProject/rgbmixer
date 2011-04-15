@@ -19,6 +19,14 @@
 
 #include "UsbProReceiver.h"
 
+
+UsbProReceiver::UsbProReceiver(void (*callback)(byte label, byte *message,
+                               unsigned int size)):
+    m_callback(callback) {
+  Serial.begin(115200);  // fast baud rate, 9600 is too slow
+}
+
+
 /*
  * Read bytes from host
  */

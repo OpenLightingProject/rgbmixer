@@ -34,6 +34,9 @@ class UsbProSender {
 
     // helper message to send an array of bytes
     void WriteMessage(byte label, int size, byte data[]);
+
+    void Write(byte b) {Serial.write(b); }
+    void Write(byte *b, unsigned int l) {Serial.write(b, l); }
 };
 
 #endif  // USBPRO_SENDER_H

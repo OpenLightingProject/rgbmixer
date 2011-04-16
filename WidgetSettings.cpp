@@ -22,59 +22,62 @@
  *   dmx start address (2)
  *   esta ID (2)
  *   serial number (4)
+ *   device label size (2)
+ *   device label (32)
  */
 
 #include <EEPROM.h>
 #include "WidgetSettings.h"
 
 
-const byte WidgetSettingsClass::MAGIC_NUMBER[] = {'o', 'z'};
+const int WidgetSettingsClass::MAGIC_NUMBER = 0x4f4c;
 const long WidgetSettingsClass::DEFAULT_SERIAL_NUMBER = 1;
+const char WidgetSettingsClass::DEFAULT_LABEL[] = "Default Label";
+const byte WidgetSettingsClass::MAX_LABEL_LENGTH = 32;
+
+const byte WidgetSettingsClass::MAGIC_NUMBER_OFFSET = 0;
+const byte WidgetSettingsClass::START_ADDRESS_OFFSET = 2;
+const byte WidgetSettingsClass::ESTA_ID_OFFSET = 4;
+const byte WidgetSettingsClass::DEVICE_LABEL_SIZE_OFFSET = 10;
+const byte WidgetSettingsClass::DEVICE_LABEL_OFFSET = 12;
 
 /**
  * Check if the settings are valid and if not initialize them
  */
 void WidgetSettingsClass::Init() {
-  bool ok = true;
-  for (byte i = 0; i < sizeof(MAGIC_NUMBER); ++i) {
-    byte value = EEPROM.read(i);
-    ok &= (value == MAGIC_NUMBER[i]);
-  }
+  int magic_number = ReadInt(MAGIC_NUMBER_OFFSET);
 
-  if (!ok) {
+  if (magic_number != MAGIC_NUMBER) {
     // init the settings
-    for (byte i = 0; i < sizeof(MAGIC_NUMBER); ++i) {
-      EEPROM.write(i, MAGIC_NUMBER[i]);
-    }
+    WriteInt(MAGIC_NUMBER_OFFSET, MAGIC_NUMBER);
     SetStartAddress(1);
     SetEstaId(0x7a70);
     SetSerialNumber(DEFAULT_SERIAL_NUMBER);
+    SetDeviceLabel(DEFAULT_LABEL, sizeof(DEFAULT_LABEL));
   } else {
-    m_start_address = ReadStartAddress();
+    m_start_address = ReadInt(START_ADDRESS_OFFSET);
   }
 }
 
 void WidgetSettingsClass::SetStartAddress(unsigned int start_address) {
-  EEPROM.write(2, start_address >> 8);
-  EEPROM.write(3, start_address);
+  WriteInt(START_ADDRESS_OFFSET, start_address);
   m_start_address = start_address;
 }
 
 
 int WidgetSettingsClass::EstaId() const {
-  return (EEPROM.read(4) << 8) + EEPROM.read(5);
+  return ReadInt(ESTA_ID_OFFSET);
 }
 
 void WidgetSettingsClass::SetEstaId(int esta_id) {
-  EEPROM.write(4, esta_id >> 8);
-  EEPROM.write(5, esta_id);
+  WriteInt(ESTA_ID_OFFSET, esta_id);
 }
 
 
 bool WidgetSettingsClass::MatchesEstaId(byte *data) const {
   bool match = true;
   for (byte i = 0; i < sizeof(long); ++i) {
-    match &= EEPROM.read(4 + i) == data[i];
+    match &= EEPROM.read(ESTA_ID_OFFSET + i) == data[i];
   }
   return match;
 }
@@ -107,9 +110,36 @@ bool WidgetSettingsClass::MatchesSerialNumber(byte *data) const {
 }
 
 
-unsigned int WidgetSettingsClass::ReadStartAddress() {
-  return (EEPROM.read(2) << 8) + EEPROM.read(3);
+byte WidgetSettingsClass::DeviceLabel(char *label, byte length) const {
+  byte size = min(ReadInt(DEVICE_LABEL_SIZE_OFFSET), length);
+  byte i = 0;
+  for (; i < size; ++i) {
+    label[i] = EEPROM.read(DEVICE_LABEL_OFFSET + i);
+    if (!label[i])
+      break;
+  }
+  return i;
 }
 
+
+void WidgetSettingsClass::SetDeviceLabel(const char *new_label,
+                                         byte length) {
+  byte size = min(MAX_LABEL_LENGTH, length);
+  for (byte i = 0; i < size; ++i) {
+    EEPROM.write(DEVICE_LABEL_OFFSET + i, new_label[i]);
+  }
+  WriteInt(DEVICE_LABEL_SIZE_OFFSET, size);
+}
+
+
+unsigned int WidgetSettingsClass::ReadInt(unsigned int offset) const {
+  return (EEPROM.read(offset) << 8) + EEPROM.read(offset + 1);
+}
+
+
+void WidgetSettingsClass::WriteInt(unsigned int offset, int data) {
+  EEPROM.write(offset, data >> 8);
+  EEPROM.write(offset + 1, data);
+}
 
 WidgetSettingsClass WidgetSettings;

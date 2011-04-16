@@ -43,13 +43,25 @@ class WidgetSettingsClass {
     // helper method to compare an array of bytes against the serial #
     bool MatchesSerialNumber(byte *data) const;
 
+    byte DeviceLabel(char *label, byte length) const;
+    void SetDeviceLabel(const char *new_label, byte length);
+
   private:
-    static const byte MAGIC_NUMBER[];
+    static const int MAGIC_NUMBER;
     static const long DEFAULT_SERIAL_NUMBER;
+    static const char DEFAULT_LABEL[];
+    static const byte MAX_LABEL_LENGTH;
+
+    static const byte MAGIC_NUMBER_OFFSET;
+    static const byte START_ADDRESS_OFFSET;
+    static const byte ESTA_ID_OFFSET;
+    static const byte DEVICE_LABEL_SIZE_OFFSET;
+    static const byte DEVICE_LABEL_OFFSET;
 
     unsigned int m_start_address;
 
-    unsigned int ReadStartAddress();
+    unsigned int ReadInt(unsigned int offset) const;
+    void WriteInt(unsigned int offset, int data);
 };
 
 extern WidgetSettingsClass WidgetSettings;

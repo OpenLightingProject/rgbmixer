@@ -51,7 +51,9 @@ char MANUFACTURER_NAME[] = "Open Lighting";
 char SUPPORTED_LANGUAGE[] = "en";
 unsigned long SOFTWARE_VERSION = 1;
 char SOFTWARE_VERSION_STRING[] = "1.0";
-unsigned int SUPPORTED_PARAMETERS[] = {0x0080, 0x0081, 0x00a0, 0x00b0};
+unsigned int SUPPORTED_PARAMETERS[] = {0x0080, 0x0081, 0x0082, 0x00a0, 0x00b0};
+const int MAX_DMX_ADDRESS = 512;
+enum { MAX_LABEL_SIZE = 32 };
 
 byte led_state = LOW;  // flash the led when we get data.
 
@@ -63,6 +65,9 @@ void HandleRDMMessage(byte *message, int size);
 void SendManufacturerResponse();
 void SendDeviceResponse();
 void SendSerialNumberResponse();
+void HandleStringRequest(byte *received_message,
+                         char *label,
+                         byte label_size);
 
 
 // global objects
@@ -72,6 +77,7 @@ RDMSender rdm_sender(&sender);
 void setup() {
   for(byte i = 0; i < sizeof(PWM_PINS); i++) {
     pinMode(PWM_PINS[i], OUTPUT);
+    analogWrite(PWM_PINS[i], 0);
   }
   pinMode(LED_PIN, OUTPUT);
   pinMode(IDENTIFY_LED_PIN, OUTPUT);
@@ -159,8 +165,9 @@ void SendManufacturerResponse() {
  * @param size the size of the dmx buffer
  */
 void SetPWM(byte data[], unsigned int size) {
-  for (byte i = 0; i < sizeof(PWM_PINS) && i < size; i++) {
-    analogWrite(PWM_PINS[i], data[i]);
+  unsigned int start_address = WidgetSettings.StartAddress() - 1;
+  for (byte i = 0; i < sizeof(PWM_PINS) && start_address + i < size; ++i) {
+    analogWrite(PWM_PINS[i], data[start_address + i]);
   }
 }
 
@@ -222,6 +229,17 @@ void HandleGetDeviceInfo(byte *received_message) {
   rdm_sender.SendIntAndChecksum(0);  // Sub device count
   rdm_sender.SendByteAndChecksum(0);  // Sensor Count
   rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET DEVICE_LABEL request
+ */
+void HandleGetDeviceLabel(byte *received_message) {
+  char device_label[MAX_LABEL_SIZE];
+  byte size = WidgetSettings.DeviceLabel(device_label, sizeof(device_label));
+
+  HandleStringRequest(received_message, device_label, size);
 }
 
 
@@ -309,6 +327,32 @@ void HandleSetLanguage(bool was_broadcast,
   }
 }
 
+
+/**
+ * Handle a SET DMX_START_ADDRESS request
+ */
+void HandleSetDeviceLabel(bool was_broadcast,
+                          int sub_device,
+                          byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] > MAX_LABEL_SIZE) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  WidgetSettings.SetDeviceLabel((char*) received_message + 24,
+                                received_message[23]);
+
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
+    rdm_sender.EndRDMResponse();
+  }
+}
+
 /**
  * Handle a SET DMX_START_ADDRESS request
  */
@@ -326,7 +370,7 @@ void HandleSetStartAddress(bool was_broadcast,
   int new_start_address = (((int) received_message[24] << 8) +
                            received_message[25]);
 
-  if (new_start_address == 0 || new_start_address > 512) {
+  if (new_start_address == 0 || new_start_address > MAX_DMX_ADDRESS) {
     rdm_sender.NackOrBroadcast(was_broadcast,
                                received_message,
                                NR_DATA_OUT_OF_RANGE);
@@ -412,6 +456,19 @@ void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
     case PID_DEVICE_INFO:
       HandleGetDeviceInfo(message);
       break;
+    case PID_DEVICE_MODEL_DESCRIPTION:
+      HandleStringRequest(message,
+                          DEVICE_NAME,
+                          sizeof(DEVICE_NAME));
+      break;
+    case PID_MANUFACTURER_LABEL:
+      HandleStringRequest(message,
+                          MANUFACTURER_NAME,
+                          sizeof(MANUFACTURER_NAME));
+      break;
+    case PID_DEVICE_LABEL:
+      HandleGetDeviceLabel(message);
+      break;
     case PID_LANGUAGE_CAPABILITIES:
     case PID_LANGUAGE:
       // these strings aren't null terminated
@@ -424,16 +481,6 @@ void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
       break;
     case PID_DMX_START_ADDRESS:
       HandleGetStartAddress(message);
-      break;
-    case PID_DEVICE_MODEL_DESCRIPTION:
-      HandleStringRequest(message,
-                          DEVICE_NAME,
-                          sizeof(DEVICE_NAME));
-      break;
-    case PID_MANUFACTURER_LABEL:
-      HandleStringRequest(message,
-                          MANUFACTURER_NAME,
-                          sizeof(MANUFACTURER_NAME));
       break;
     case PID_IDENTIFY_DEVICE:
       HandleGetIdentifyDevice(message);
@@ -453,6 +500,9 @@ void HandleRDMSet(int param_id, bool is_broadcast, int sub_device,
   switch (param_id) {
     case PID_LANGUAGE:
       HandleSetLanguage(is_broadcast, sub_device, message);
+      break;
+    case PID_DEVICE_LABEL:
+      HandleSetDeviceLabel(is_broadcast, sub_device, message);
       break;
     case PID_DMX_START_ADDRESS:
       HandleSetStartAddress(is_broadcast, sub_device, message);

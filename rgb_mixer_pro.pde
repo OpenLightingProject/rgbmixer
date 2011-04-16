@@ -31,10 +31,12 @@
  *   Initial Release.
  */
 
+#include "MessageLabels.h"
+#include "RDMEnums.h"
+#include "RDMSender.h"
 #include "UsbProReceiver.h"
 #include "UsbProSender.h"
 #include "WidgetSettings.h"
-#include "RDMEnums.h"
 
 // Pin constants
 const byte LED_PIN = 13;
@@ -50,20 +52,6 @@ unsigned long SOFTWARE_VERSION = 1;
 char SOFTWARE_VERSION_STRING[] = "1.0";
 unsigned int SUPPORTED_PARAMETERS[] = {0x0080, 0x0081};
 
-// Message Label Codes
-enum {
-  PARAMETERS_LABEL = 3,
-  DMX_DATA_LABEL = 6,
-  SERIAL_NUMBER_LABEL = 10,
-  MANUFACTURER_LABEL = 77,
-  NAME_LABEL = 78,
-  RDM_LABEL = 82,
-};
-
-
-// RDM globals
-unsigned int current_checksum;
-
 byte led_state = LOW;  // flash the led when we get data.
 
 bool identify_mode_enabled = false;
@@ -75,7 +63,10 @@ void SendManufacturerResponse();
 void SendDeviceResponse();
 void SendSerialNumberResponse();
 
+
+// global objects
 UsbProSender sender;
+RDMSender rdm_sender(&sender);
 
 void setup() {
   for(byte i = 0; i < sizeof(PWM_PINS); i++) {
@@ -139,6 +130,7 @@ void SendSerialNumberResponse() {
   sender.SendMessageFooter();
 }
 
+
 void SendDeviceResponse() {
   sender.SendMessageHeader(NAME_LABEL,
                            sizeof(DEVICE_ID) + sizeof(DEVICE_NAME));
@@ -190,124 +182,23 @@ bool VerifyChecksum(byte *message, int size) {
 }
 
 
-void ReturnRDMErrorResponse(byte error_code) {
-  sender.SendMessageHeader(RDM_LABEL, 1);
-  sender.Write(error_code);
-  sender.SendMessageFooter();
-}
-
-
-void SendByteAndChecksum(byte b) {
-  current_checksum += b;
-  Serial.write(b);
-}
-
-void SendIntAndChecksum(int i) {
-  SendByteAndChecksum(i >> 8);
-  SendByteAndChecksum(i);
-}
-
-void SendLongAndChecksum(long l) {
-  SendIntAndChecksum(l >> 16);
-  SendIntAndChecksum(l);
-}
-
-/**
- * Send the RDM header
- */
-void StartRDMResponse(byte *received_message,
-                      rdm_response_type response_type,
-                      unsigned int param_data_size) {
-  // set the global checksum to 0
-  current_checksum = 0;
-  // size is the rdm status code, the rdm header + the param_data_size
-  sender.SendMessageHeader(RDM_LABEL,
-                           1 + MINIMUM_RDM_PACKET_SIZE + param_data_size);
-  SendByteAndChecksum(RDM_STATUS_OK);
-  SendByteAndChecksum(START_CODE);
-  SendByteAndChecksum(SUB_START_CODE);
-  SendByteAndChecksum(MINIMUM_RDM_PACKET_SIZE - 2 + param_data_size);
-
-  // copy the src uid into the dst uid field
-  SendByteAndChecksum(received_message[9]);
-  SendByteAndChecksum(received_message[10]);
-  SendByteAndChecksum(received_message[11]);
-  SendByteAndChecksum(received_message[12]);
-  SendByteAndChecksum(received_message[13]);
-  SendByteAndChecksum(received_message[14]);
-
-  // add our UID as the src, the ESTA_ID & fields are reversed
-  SendIntAndChecksum(WidgetSettings.EstaId());
-  SendLongAndChecksum(WidgetSettings.SerialNumber());
-
-  SendByteAndChecksum(received_message[15]);  // transaction #
-  SendByteAndChecksum(response_type);  // response type
-  SendByteAndChecksum(0);  // message count
-
-  // sub device
-  SendByteAndChecksum(received_message[18]);
-  SendByteAndChecksum(received_message[19]);
-
-  // command class
-  if (received_message[20] == GET_COMMAND) {
-    SendByteAndChecksum(GET_COMMAND_RESPONSE);
-  } else {
-    SendByteAndChecksum(SET_COMMAND_RESPONSE);
-  }
-
-  // param id, we don't use queued messages so this always matches the request
-  SendByteAndChecksum(received_message[21]);
-  SendByteAndChecksum(received_message[22]);
-  SendByteAndChecksum(param_data_size);
-}
-
-
-void EndRDMResponse() {
-  Serial.write(current_checksum >> 8);
-  Serial.write(current_checksum);
-  sender.SendMessageFooter();
-}
-
-
-/**
- * Send a Nack response
- * @param received_message a pointer to the received RDM message
- * @param nack_reason the NACK reasons
- */
-void SendNack(byte *received_message, rdm_nack_reason nack_reason) {
-  StartRDMResponse(received_message, RDM_RESPONSE_NACK, 2);
-  SendIntAndChecksum(nack_reason);
-  EndRDMResponse();
-}
-
-
-void NackOrBroadcast(bool was_broadcast,
-                     byte *received_message,
-                     rdm_nack_reason nack_reason) {
-  if (was_broadcast)
-    ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
-  else
-    SendNack(received_message, nack_reason);
-}
-
-
 /**
  * Handle a GET SUPPORTED_PARAMETERS request
  */
 void HandleGetSupportedParameters(byte *received_message) {
   if (received_message[23]) {
-    SendNack(received_message, NR_FORMAT_ERROR);
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
     return;
   }
 
-  StartRDMResponse(received_message,
-                   RDM_RESPONSE_ACK,
-                   sizeof(SUPPORTED_PARAMETERS));
+  rdm_sender.StartRDMResponse(received_message,
+                              RDM_RESPONSE_ACK,
+                              sizeof(SUPPORTED_PARAMETERS));
   for (byte i = 0; i < sizeof(SUPPORTED_PARAMETERS) / sizeof(int); ++i) {
-    SendIntAndChecksum(SUPPORTED_PARAMETERS[i]);
+    rdm_sender.SendIntAndChecksum(SUPPORTED_PARAMETERS[i]);
   }
 
-  EndRDMResponse();
+  rdm_sender.EndRDMResponse();
 }
 
 /**
@@ -315,23 +206,23 @@ void HandleGetSupportedParameters(byte *received_message) {
  */
 void HandleGetDeviceInfo(byte *received_message) {
   if (received_message[23]) {
-    SendNack(received_message, NR_FORMAT_ERROR);
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
     return;
   }
 
-  StartRDMResponse(received_message, RDM_RESPONSE_ACK, 19);
-  SendIntAndChecksum(256);  // protocol version
-  SendIntAndChecksum(2);  // device model
-  SendIntAndChecksum(0x0508);  // product category
-  SendLongAndChecksum(SOFTWARE_VERSION);  // software version
-  //SendIntAndChecksum(3);  // DMX footprint
-  SendIntAndChecksum(0);  // DMX footprint
-  SendIntAndChecksum(0x0101);  // DMX Personality
-  //SendIntAndChecksum(dmx_start_address);  // DMX Start Address
-  SendIntAndChecksum(0xffff);  // DMX Start Address
-  SendIntAndChecksum(0);  // Sub device count
-  SendByteAndChecksum(0);  // Sensor Count
-  EndRDMResponse();
+  rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 19);
+  rdm_sender.SendIntAndChecksum(256);  // protocol version
+  rdm_sender.SendIntAndChecksum(2);  // device model
+  rdm_sender.SendIntAndChecksum(0x0508);  // product category
+  rdm_sender.SendLongAndChecksum(SOFTWARE_VERSION);  // software version
+  //rdm_sender.SendIntAndChecksum(3);  // DMX footprint
+  rdm_sender.SendIntAndChecksum(0);  // DMX footprint
+  rdm_sender.SendIntAndChecksum(0x0101);  // DMX Personality
+  //rdm_sender.SendIntAndChecksum(dmx_start_address);  // DMX Start Address
+  rdm_sender.SendIntAndChecksum(0xffff);  // DMX Start Address
+  rdm_sender.SendIntAndChecksum(0);  // Sub device count
+  rdm_sender.SendByteAndChecksum(0);  // Sensor Count
+  rdm_sender.EndRDMResponse();
 }
 
 
@@ -340,16 +231,16 @@ void HandleGetDeviceInfo(byte *received_message) {
  */
 void HandleGetSoftwareVersion(byte *received_message) {
   if (received_message[23]) {
-    SendNack(received_message, NR_FORMAT_ERROR);
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
     return;
   }
 
-  StartRDMResponse(received_message,
+  rdm_sender.StartRDMResponse(received_message,
                    RDM_RESPONSE_ACK,
                    sizeof(SOFTWARE_VERSION_STRING));
   for (unsigned int i = 0; i < sizeof(SOFTWARE_VERSION_STRING); ++i)
-    SendByteAndChecksum(SOFTWARE_VERSION_STRING[i]);
-  EndRDMResponse();
+    rdm_sender.SendByteAndChecksum(SOFTWARE_VERSION_STRING[i]);
+  rdm_sender.EndRDMResponse();
 }
 
 
@@ -358,13 +249,13 @@ void HandleGetSoftwareVersion(byte *received_message) {
  */
 void HandleGetIdentifyDevice(byte *received_message) {
   if (received_message[23]) {
-    SendNack(received_message, NR_FORMAT_ERROR);
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
     return;
   }
 
-  StartRDMResponse(received_message, RDM_RESPONSE_ACK, 1);
-  SendByteAndChecksum(identify_mode_enabled);
-  EndRDMResponse();
+  rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 1);
+  rdm_sender.SendByteAndChecksum(identify_mode_enabled);
+  rdm_sender.EndRDMResponse();
 }
 
 
@@ -377,7 +268,9 @@ void HandleSetIdentifyDevice(bool was_broadcast,
   // check for invalid size or value
   if (received_message[23] != 1 ||
       (received_message[24] != 0 && received_message[24] != 1)) {
-    NackOrBroadcast(was_broadcast, received_message, NR_FORMAT_ERROR);
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
     return;
   }
 
@@ -385,10 +278,10 @@ void HandleSetIdentifyDevice(bool was_broadcast,
   digitalWrite(IDENTIFY_LED_PIN, identify_mode_enabled);
 
   if (was_broadcast) {
-    ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
   } else {
-    StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
-    EndRDMResponse();
+    rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
+    rdm_sender.EndRDMResponse();
   }
 }
 
@@ -401,15 +294,14 @@ void HandleStringRequest(byte *received_message,
                          char *label,
                          byte label_size) {
   if (received_message[23]) {
-    SendNack(received_message, NR_FORMAT_ERROR);
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
     return;
   }
 
-
-  StartRDMResponse(received_message, RDM_RESPONSE_ACK, label_size);
+  rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, label_size);
   for (unsigned int i = 0; i < label_size; ++i)
-    SendByteAndChecksum(label[i]);
-  EndRDMResponse();
+    rdm_sender.SendByteAndChecksum(label[i]);
+  rdm_sender.EndRDMResponse();
 }
 
 
@@ -419,12 +311,12 @@ void HandleStringRequest(byte *received_message,
 void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
                   byte *message) {
   if (is_broadcast) {
-    ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
     return;
   }
 
   if (sub_device) {
-    SendNack(message, NR_SUB_DEVICE_OUT_OF_RANGE);
+    rdm_sender.SendNack(message, NR_SUB_DEVICE_OUT_OF_RANGE);
     return;
   }
 
@@ -452,7 +344,7 @@ void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
       HandleGetIdentifyDevice(message);
       break;
     default:
-      NackOrBroadcast(is_broadcast, message, NR_UNKNOWN_PID);
+      rdm_sender.NackOrBroadcast(is_broadcast, message, NR_UNKNOWN_PID);
   }
 }
 
@@ -469,7 +361,7 @@ void HandleRDMSet(int param_id, bool is_broadcast, int sub_device,
       HandleSetIdentifyDevice(is_broadcast, sub_device, message);
       break;
     default:
-      NackOrBroadcast(is_broadcast, message, NR_UNKNOWN_PID);
+      rdm_sender.NackOrBroadcast(is_broadcast, message, NR_UNKNOWN_PID);
   }
 }
 
@@ -485,12 +377,12 @@ void HandleRDMMessage(byte *message, int size) {
   // or a mismatched message length.
   if (size < MINIMUM_RDM_PACKET_SIZE || message[0] != START_CODE ||
       message[1] != SUB_START_CODE || message[2] != size - 2) {
-    ReturnRDMErrorResponse(RDM_STATUS_FAILED);
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_FAILED);
     return;
   }
 
   if (!VerifyChecksum(message, size)) {
-    ReturnRDMErrorResponse(RDM_STATUS_FAILED_CHECKSUM);
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_FAILED_CHECKSUM);
     return;
   }
 
@@ -510,21 +402,23 @@ void HandleRDMMessage(byte *message, int size) {
     WidgetSettings.MatchesSerialNumber(message + 5));
 
   if (!to_us) {
-    ReturnRDMErrorResponse(RDM_STATUS_INVALID_DESTINATION);
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_INVALID_DESTINATION);
     return;
   }
 
   // check the command class
   byte command_class = message[20];
   if (command_class != GET_COMMAND && command_class != SET_COMMAND) {
-    ReturnRDMErrorResponse(RDM_STATUS_INVALID_COMMAND);
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_INVALID_COMMAND);
   }
 
   // check sub devices
   unsigned int sub_device = (message[18] << 8) + message[19];
   if (sub_device != 0 && sub_device != 0xffff) {
     // respond with nack
-    NackOrBroadcast(is_broadcast, message, NR_SUB_DEVICE_OUT_OF_RANGE);
+    rdm_sender.NackOrBroadcast(is_broadcast,
+                               message,
+                               NR_SUB_DEVICE_OUT_OF_RANGE);
     return;
   }
 

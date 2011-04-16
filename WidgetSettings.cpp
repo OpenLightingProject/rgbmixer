@@ -41,8 +41,6 @@ void WidgetSettingsClass::Init() {
     ok &= (value == MAGIC_NUMBER[i]);
   }
 
-  digitalWrite(12, ok);
-
   if (!ok) {
     // init the settings
     for (byte i = 0; i < sizeof(MAGIC_NUMBER); ++i) {

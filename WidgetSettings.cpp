@@ -49,20 +49,19 @@ void WidgetSettingsClass::Init() {
     SetStartAddress(1);
     SetEstaId(0x7a70);
     SetSerialNumber(DEFAULT_SERIAL_NUMBER);
+  } else {
+    m_start_address = ReadStartAddress();
   }
 }
 
-int WidgetSettingsClass::StartAddress() {
-  return (EEPROM.read(2) << 8) + EEPROM.read(3);
-}
-
-void WidgetSettingsClass::SetStartAddress(int start_address) {
+void WidgetSettingsClass::SetStartAddress(unsigned int start_address) {
   EEPROM.write(2, start_address >> 8);
   EEPROM.write(3, start_address);
+  m_start_address = start_address;
 }
 
 
-int WidgetSettingsClass::EstaId() {
+int WidgetSettingsClass::EstaId() const {
   return (EEPROM.read(4) << 8) + EEPROM.read(5);
 }
 
@@ -72,7 +71,7 @@ void WidgetSettingsClass::SetEstaId(int esta_id) {
 }
 
 
-bool WidgetSettingsClass::MatchesEstaId(byte *data) {
+bool WidgetSettingsClass::MatchesEstaId(byte *data) const {
   bool match = true;
   for (byte i = 0; i < sizeof(long); ++i) {
     match &= EEPROM.read(4 + i) == data[i];
@@ -81,7 +80,7 @@ bool WidgetSettingsClass::MatchesEstaId(byte *data) {
 }
 
 
-long WidgetSettingsClass::SerialNumber() {
+long WidgetSettingsClass::SerialNumber() const {
   long serial = 0;
   for (byte i = 0; i < sizeof(serial); ++i) {
     serial = serial << 8;
@@ -99,12 +98,18 @@ void WidgetSettingsClass::SetSerialNumber(long serial_number) {
 }
 
 
-bool WidgetSettingsClass::MatchesSerialNumber(byte *data) {
+bool WidgetSettingsClass::MatchesSerialNumber(byte *data) const {
   bool match = true;
   for (byte i = 0; i < sizeof(long); ++i) {
     match &= EEPROM.read(6 + i) == data[i];
   }
   return match;
 }
+
+
+unsigned int WidgetSettingsClass::ReadStartAddress() {
+  return (EEPROM.read(2) << 8) + EEPROM.read(3);
+}
+
 
 WidgetSettingsClass WidgetSettings;

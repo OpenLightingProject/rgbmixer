@@ -30,22 +30,26 @@ class WidgetSettingsClass {
     WidgetSettingsClass() {}
     void Init();
 
-    int StartAddress();
-    void SetStartAddress(int start_address);
+    unsigned int StartAddress() const { return m_start_address; };
+    void SetStartAddress(unsigned int start_address);
 
-    int EstaId();
+    int EstaId() const;
     void SetEstaId(int esta_id);
     // helper method to compare an array of bytes against the esta id
-    bool MatchesEstaId(byte *data);
+    bool MatchesEstaId(byte *data) const;
 
-    long SerialNumber();
+    long SerialNumber() const;
     void SetSerialNumber(long serial_number);
     // helper method to compare an array of bytes against the serial #
-    bool MatchesSerialNumber(byte *data);
+    bool MatchesSerialNumber(byte *data) const;
 
   private:
     static const byte MAGIC_NUMBER[];
     static const long DEFAULT_SERIAL_NUMBER;
+
+    unsigned int m_start_address;
+
+    unsigned int ReadStartAddress();
 };
 
 extern WidgetSettingsClass WidgetSettings;

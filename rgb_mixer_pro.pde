@@ -294,19 +294,7 @@ void NackOrBroadcast(bool was_broadcast,
 /**
  * Handle a GET SUPPORTED_PARAMETERS request
  */
-void HandleGetSupportedParameters(bool was_broadcast,
-                                  int sub_device,
-                                  byte *received_message) {
-  if (was_broadcast) {
-    ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
-    return;
-  }
-
-  if (sub_device) {
-    SendNack(received_message, NR_SUB_DEVICE_OUT_OF_RANGE);
-    return;
-  }
-
+void HandleGetSupportedParameters(byte *received_message) {
   if (received_message[23]) {
     SendNack(received_message, NR_FORMAT_ERROR);
     return;
@@ -325,19 +313,7 @@ void HandleGetSupportedParameters(bool was_broadcast,
 /**
  * Handle a GET DEVICE_INFO request
  */
-void HandleGetDeviceInfo(bool was_broadcast,
-                         int sub_device,
-                         byte *received_message) {
-  if (was_broadcast) {
-    ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
-    return;
-  }
-
-  if (sub_device) {
-    SendNack(received_message, NR_SUB_DEVICE_OUT_OF_RANGE);
-    return;
-  }
-
+void HandleGetDeviceInfo(byte *received_message) {
   if (received_message[23]) {
     SendNack(received_message, NR_FORMAT_ERROR);
     return;
@@ -362,19 +338,7 @@ void HandleGetDeviceInfo(bool was_broadcast,
 /**
  * Handle a GET SOFTWARE_VERSION_LABEL request
  */
-void HandleGetSoftwareVersion(bool was_broadcast,
-                              int sub_device,
-                              byte *received_message) {
-  if (was_broadcast) {
-    ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
-    return;
-  }
-
-  if (sub_device) {
-    SendNack(received_message, NR_SUB_DEVICE_OUT_OF_RANGE);
-    return;
-  }
-
+void HandleGetSoftwareVersion(byte *received_message) {
   if (received_message[23]) {
     SendNack(received_message, NR_FORMAT_ERROR);
     return;
@@ -392,19 +356,7 @@ void HandleGetSoftwareVersion(bool was_broadcast,
 /**
  * Handle a GET IDENTIFY_DEVICE request
  */
-void HandleGetIdentifyDevice(bool was_broadcast,
-                             int sub_device,
-                             byte *received_message) {
-  if (was_broadcast) {
-    ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
-    return;
-  }
-
-  if (sub_device) {
-    SendNack(received_message, NR_SUB_DEVICE_OUT_OF_RANGE);
-    return;
-  }
-
+void HandleGetIdentifyDevice(byte *received_message) {
   if (received_message[23]) {
     SendNack(received_message, NR_FORMAT_ERROR);
     return;
@@ -445,21 +397,9 @@ void HandleSetIdentifyDevice(bool was_broadcast,
  * Handle a GET request for a PID that returns a string
  *
  */
-void HandleStringRequest(bool was_broadcast,
-                         int sub_device,
-                         byte *received_message,
+void HandleStringRequest(byte *received_message,
                          char *label,
                          byte label_size) {
-  if (was_broadcast) {
-    ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
-    return;
-  }
-
-  if (sub_device) {
-    SendNack(received_message, NR_SUB_DEVICE_OUT_OF_RANGE);
-    return;
-  }
-
   if (received_message[23]) {
     SendNack(received_message, NR_FORMAT_ERROR);
     return;
@@ -470,6 +410,67 @@ void HandleStringRequest(bool was_broadcast,
   for (unsigned int i = 0; i < label_size; ++i)
     SendByteAndChecksum(label[i]);
   EndRDMResponse();
+}
+
+
+/**
+ * Handle an RDM GET request
+ */
+void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
+                  byte *message) {
+  if (is_broadcast) {
+    ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+    return;
+  }
+
+  if (sub_device) {
+    SendNack(message, NR_SUB_DEVICE_OUT_OF_RANGE);
+    return;
+  }
+
+  switch (param_id) {
+    case PID_SUPPORTED_PARAMETERS:
+      HandleGetSupportedParameters(message);
+      break;
+    case PID_DEVICE_INFO:
+      HandleGetDeviceInfo(message);
+      break;
+    case PID_SOFTWARE_VERSION_LABEL:
+      HandleGetSoftwareVersion(message);
+      break;
+    case PID_DEVICE_MODEL_DESCRIPTION:
+      HandleStringRequest(message,
+                          DEVICE_NAME,
+                          sizeof(DEVICE_NAME));
+      break;
+    case PID_MANUFACTURER_LABEL:
+      HandleStringRequest(message,
+                          MANUFACTURER_NAME,
+                          sizeof(MANUFACTURER_NAME));
+      break;
+    case PID_IDENTIFY_DEVICE:
+      HandleGetIdentifyDevice(message);
+      break;
+    default:
+      NackOrBroadcast(is_broadcast, message, NR_UNKNOWN_PID);
+  }
+}
+
+
+/**
+ * Handle an RDM SET request
+ */
+void HandleRDMSet(int param_id, bool is_broadcast, int sub_device,
+                  byte *message) {
+
+
+  switch (param_id) {
+    case PID_IDENTIFY_DEVICE:
+      HandleSetIdentifyDevice(is_broadcast, sub_device, message);
+      break;
+    default:
+      NackOrBroadcast(is_broadcast, message, NR_UNKNOWN_PID);
+  }
 }
 
 
@@ -535,52 +536,10 @@ void HandleRDMMessage(byte *message, int size) {
     data[0] = RDM_STATUS_BROADCAST;
   }
 
-  switch (param_id) {
-    case PID_SUPPORTED_PARAMETERS:
-      if (command_class == GET_COMMAND)
-        HandleGetSupportedParameters(is_broadcast, sub_device, message);
-      else
-        NackOrBroadcast(is_broadcast, message, NR_UNSUPPORTED_COMMAND_CLASS);
-      break;
-    case PID_DEVICE_INFO:
-      if (command_class == GET_COMMAND)
-        HandleGetDeviceInfo(is_broadcast, sub_device, message);
-      else
-        NackOrBroadcast(is_broadcast, message, NR_UNSUPPORTED_COMMAND_CLASS);
-      break;
-    case PID_SOFTWARE_VERSION_LABEL:
-      if (command_class == GET_COMMAND)
-        HandleGetSoftwareVersion(is_broadcast, sub_device, message);
-      else
-        NackOrBroadcast(is_broadcast, message, NR_UNSUPPORTED_COMMAND_CLASS);
-      break;
-    case PID_DEVICE_MODEL_DESCRIPTION:
-      if (command_class == GET_COMMAND)
-        HandleStringRequest(is_broadcast,
-                            sub_device,
-                            message,
-                            DEVICE_NAME,
-                            sizeof(DEVICE_NAME));
-      else
-        NackOrBroadcast(is_broadcast, message, NR_UNSUPPORTED_COMMAND_CLASS);
-      break;
-    case PID_MANUFACTURER_LABEL:
-      if (command_class == GET_COMMAND)
-        HandleStringRequest(is_broadcast,
-                            sub_device,
-                            message,
-                            MANUFACTURER_NAME,
-                            sizeof(MANUFACTURER_NAME));
-      else
-        NackOrBroadcast(is_broadcast, message, NR_UNSUPPORTED_COMMAND_CLASS);
-      break;
-    case PID_IDENTIFY_DEVICE:
-      if (command_class == GET_COMMAND)
-        HandleGetIdentifyDevice(is_broadcast, sub_device, message);
-      else
-        HandleSetIdentifyDevice(is_broadcast, sub_device, message);
-      break;
-    default:
-      NackOrBroadcast(is_broadcast, message, NR_UNKNOWN_PID);
+  if (command_class == GET_COMMAND) {
+    HandleRDMGet(param_id, is_broadcast, sub_device, message);
+    return;
+  } else  {
+    HandleRDMSet(param_id, is_broadcast, sub_device, message);
   }
 }

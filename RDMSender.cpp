@@ -22,24 +22,24 @@
 #include "WidgetSettings.h"
 
 
-void RDMSender::ReturnRDMErrorResponse(byte error_code) {
+void RDMSender::ReturnRDMErrorResponse(byte error_code) const {
   m_sender->SendMessageHeader(RDM_LABEL, 1);
   m_sender->Write(error_code);
   m_sender->SendMessageFooter();
 }
 
 
-void RDMSender::SendByteAndChecksum(byte b) {
+void RDMSender::SendByteAndChecksum(byte b) const {
   m_current_checksum += b;
   m_sender->Write(b);
 }
 
-void RDMSender::SendIntAndChecksum(int i) {
+void RDMSender::SendIntAndChecksum(int i) const {
   SendByteAndChecksum(i >> 8);
   SendByteAndChecksum(i);
 }
 
-void RDMSender::SendLongAndChecksum(long l) {
+void RDMSender::SendLongAndChecksum(long l) const {
   SendIntAndChecksum(l >> 16);
   SendIntAndChecksum(l);
 }
@@ -49,7 +49,7 @@ void RDMSender::SendLongAndChecksum(long l) {
  */
 void RDMSender::StartRDMResponse(byte *received_message,
                                  rdm_response_type response_type,
-                                 unsigned int param_data_size) {
+                                 unsigned int param_data_size) const {
   // set the global checksum to 0
   m_current_checksum = 0;
   // size is the rdm status code, the rdm header + the param_data_size
@@ -94,7 +94,7 @@ void RDMSender::StartRDMResponse(byte *received_message,
 }
 
 
-void RDMSender::EndRDMResponse() {
+void RDMSender::EndRDMResponse() const {
   m_sender->Write(m_current_checksum >> 8);
   m_sender->Write(m_current_checksum);
   m_sender->SendMessageFooter();
@@ -106,7 +106,8 @@ void RDMSender::EndRDMResponse() {
  * @param received_message a pointer to the received RDM message
  * @param nack_reason the NACK reasons
  */
-void RDMSender::SendNack(byte *received_message, rdm_nack_reason nack_reason) {
+void RDMSender::SendNack(byte *received_message,
+                        rdm_nack_reason nack_reason) const {
   StartRDMResponse(received_message, RDM_RESPONSE_NACK, 2);
   SendIntAndChecksum(nack_reason);
   EndRDMResponse();
@@ -115,7 +116,7 @@ void RDMSender::SendNack(byte *received_message, rdm_nack_reason nack_reason) {
 
 void RDMSender::NackOrBroadcast(bool was_broadcast,
                                 byte *received_message,
-                                rdm_nack_reason nack_reason) {
+                                rdm_nack_reason nack_reason) const {
   if (was_broadcast)
     ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
   else

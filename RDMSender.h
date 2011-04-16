@@ -33,26 +33,26 @@ class RDMSender {
       : m_sender(sender),
         m_current_checksum(0) {}
 
-    void ReturnRDMErrorResponse(byte error_code);
+    void ReturnRDMErrorResponse(byte error_code) const;
 
     void StartRDMResponse(byte *received_message,
                           rdm_response_type response_type,
-                          unsigned int param_data_size);
-    void SendByteAndChecksum(byte b);
-    void SendIntAndChecksum(int i);
-    void SendLongAndChecksum(long l);
-    void EndRDMResponse();
+                          unsigned int param_data_size) const;
+    void SendByteAndChecksum(byte b) const;
+    void SendIntAndChecksum(int i) const;
+    void SendLongAndChecksum(long l) const;
+    void EndRDMResponse() const;
 
     // helper method to send nacks
-    void SendNack(byte *received_message, rdm_nack_reason nack_reason);
+    void SendNack(byte *received_message, rdm_nack_reason nack_reason) const;
     // helper method to either send a nack, or a broadcast response code
     void NackOrBroadcast(bool was_broadcast,
                          byte *received_message,
-                         rdm_nack_reason nack_reason);
+                         rdm_nack_reason nack_reason) const;
 
   private:
     const UsbProSender *m_sender;
-    unsigned int m_current_checksum;
+    mutable unsigned int m_current_checksum;
 };
 
 #endif  // RDM_SENDER_H

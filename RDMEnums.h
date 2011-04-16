@@ -80,10 +80,8 @@ typedef enum {
   */
   // RDM information
   PID_SUPPORTED_PARAMETERS = 0x0050,
-  /*
   PID_PARAMETER_DESCRIPTION = 0x0051,
   // production information
-  */
   PID_DEVICE_INFO = 0x0060,
   /*
   PID_PRODUCT_DETAIL_ID_LIST = 0x0070,
@@ -139,6 +137,9 @@ typedef enum {
   PID_CAPTURE_PRESET = 0x1030,
   PID_PRESET_PLAYBACK = 0x1031,
   */
+
+  // Manufacturer PID follow
+  PID_MANUFACTURER_SET_SERIAL = 0x8000,
 } rdm_pid;
 
 #endif  // RDMENUMS_H

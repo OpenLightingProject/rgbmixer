@@ -51,9 +51,11 @@ char MANUFACTURER_NAME[] = "Open Lighting";
 char SUPPORTED_LANGUAGE[] = "en";
 unsigned long SOFTWARE_VERSION = 1;
 char SOFTWARE_VERSION_STRING[] = "1.0";
-unsigned int SUPPORTED_PARAMETERS[] = {0x0080, 0x0081, 0x0082, 0x00a0, 0x00b0};
+unsigned int SUPPORTED_PARAMETERS[] = {0x0080, 0x0081, 0x0082, 0x00a0, 0x00b0,
+                                       0x8000};
 const int MAX_DMX_ADDRESS = 512;
 enum { MAX_LABEL_SIZE = 32 };
+const char SET_SERIAL_PID_DESCRIPTION[] = "Set Serial Number";
 
 byte led_state = LOW;  // flash the led when we get data.
 
@@ -209,6 +211,43 @@ void HandleGetSupportedParameters(byte *received_message) {
   rdm_sender.EndRDMResponse();
 }
 
+
+/**
+ * Handle a GET PARAMETER_DESCRIPTION request
+ */
+void HandleGetParameterDescription(byte *received_message) {
+  if (received_message[23] != 2) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  unsigned int param_id = (((unsigned int) received_message[24] << 8) +
+                           received_message[25]);
+
+  if (param_id != 0x8000) {
+    rdm_sender.SendNack(received_message, NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK,
+                              20 + sizeof(SET_SERIAL_PID_DESCRIPTION) - 1);
+  rdm_sender.SendIntAndChecksum(0x8000);
+  rdm_sender.SendByteAndChecksum(4);  // pdl size
+  rdm_sender.SendByteAndChecksum(0x03);  // data type, uint8
+  rdm_sender.SendByteAndChecksum(0x02);  // command class, set only
+  rdm_sender.SendByteAndChecksum(0);  // type
+  rdm_sender.SendByteAndChecksum(0);  // unit, none
+  rdm_sender.SendByteAndChecksum(0);  // prefix, none
+  rdm_sender.SendLongAndChecksum(0);  // min
+  rdm_sender.SendLongAndChecksum(0xfffffffe);  // max
+  rdm_sender.SendLongAndChecksum(1);  // default
+
+  for (unsigned int i = 0; i < sizeof(SET_SERIAL_PID_DESCRIPTION) - 1; ++i)
+    rdm_sender.SendByteAndChecksum(SET_SERIAL_PID_DESCRIPTION[i]);
+  rdm_sender.EndRDMResponse();
+}
+
+
 /**
  * Handle a GET DEVICE_INFO request
  */
@@ -353,6 +392,7 @@ void HandleSetDeviceLabel(bool was_broadcast,
   }
 }
 
+
 /**
  * Handle a SET DMX_START_ADDRESS request
  */
@@ -416,6 +456,42 @@ void HandleSetIdentifyDevice(bool was_broadcast,
 
 
 /**
+ * Handle a SET SERIAL_NUMBER request
+ */
+void HandleSetSerial(bool was_broadcast,
+                     int sub_device,
+                     byte *received_message) {
+  if (received_message[23] != 4) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  unsigned long new_serial_number = 0;
+  for (byte i = 0; i < 4; ++i) {
+    new_serial_number = new_serial_number << 8;
+    new_serial_number += received_message[24 + i];
+  }
+
+  if (new_serial_number == 0xffffffff) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  WidgetSettings.SetSerialNumber(new_serial_number);
+
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
+    rdm_sender.EndRDMResponse();
+  }
+}
+
+/**
  * Handle a GET request for a PID that returns a string
  *
  */
@@ -452,6 +528,9 @@ void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
   switch (param_id) {
     case PID_SUPPORTED_PARAMETERS:
       HandleGetSupportedParameters(message);
+      break;
+    case PID_PARAMETER_DESCRIPTION:
+      HandleGetParameterDescription(message);
       break;
     case PID_DEVICE_INFO:
       HandleGetDeviceInfo(message);
@@ -509,6 +588,9 @@ void HandleRDMSet(int param_id, bool is_broadcast, int sub_device,
       break;
     case PID_IDENTIFY_DEVICE:
       HandleSetIdentifyDevice(is_broadcast, sub_device, message);
+      break;
+    case PID_MANUFACTURER_SET_SERIAL:
+      HandleSetSerial(is_broadcast, sub_device, message);
       break;
     default:
       rdm_sender.NackOrBroadcast(is_broadcast, message, NR_UNKNOWN_PID);

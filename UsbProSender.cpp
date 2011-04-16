@@ -23,7 +23,7 @@
 /**
  * Sends the message header
  */
-void UsbProSender::SendMessageHeader(byte label, int size) {
+void UsbProSender::SendMessageHeader(byte label, int size) const {
   Serial.write(0x7E);
   Serial.write(label);
   Serial.write(size);
@@ -33,7 +33,7 @@ void UsbProSender::SendMessageHeader(byte label, int size) {
 /**
  * Sends the message footer
  */
-void UsbProSender::SendMessageFooter() {
+void UsbProSender::SendMessageFooter() const {
   Serial.write(0xE7);
 }
 
@@ -44,7 +44,7 @@ void UsbProSender::SendMessageFooter() {
  * @param size the length of the data
  * @param data the data buffer
  */
-void UsbProSender::WriteMessage(byte label, int size, byte data[]) {
+void UsbProSender::WriteMessage(byte label, int size, byte data[]) const {
   SendMessageHeader(label, size);
   Serial.write(data, size);
   SendMessageFooter();

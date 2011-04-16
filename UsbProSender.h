@@ -29,14 +29,14 @@ class UsbProSender {
   public:
     UsbProSender() {}
 
-    void SendMessageHeader(byte label, int size);
-    void SendMessageFooter();
+    void SendMessageHeader(byte label, int size) const;
+    void SendMessageFooter() const;
 
     // helper message to send an array of bytes
-    void WriteMessage(byte label, int size, byte data[]);
+    void WriteMessage(byte label, int size, byte data[]) const;
 
-    void Write(byte b) {Serial.write(b); }
-    void Write(byte *b, unsigned int l) {Serial.write(b, l); }
+    void Write(byte b) const { Serial.write(b); }
+    void Write(byte *b, unsigned int l) const { Serial.write(b, l); }
 };
 
 #endif  // USBPRO_SENDER_H

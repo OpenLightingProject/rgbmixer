@@ -48,9 +48,10 @@ byte DEVICE_PARAMS[] = {0, 1, 0, 0, 40};
 byte DEVICE_ID[] = {1, 0};
 char DEVICE_NAME[] = "Arduino RGB Mixer";
 char MANUFACTURER_NAME[] = "Open Lighting";
+char SUPPORTED_LANGUAGE[] = "en";
 unsigned long SOFTWARE_VERSION = 1;
 char SOFTWARE_VERSION_STRING[] = "1.0";
-unsigned int SUPPORTED_PARAMETERS[] = {0x0080, 0x0081};
+unsigned int SUPPORTED_PARAMETERS[] = {0x0080, 0x0081, 0x00a0, 0x00b0};
 
 byte led_state = LOW;  // flash the led when we get data.
 
@@ -215,11 +216,9 @@ void HandleGetDeviceInfo(byte *received_message) {
   rdm_sender.SendIntAndChecksum(2);  // device model
   rdm_sender.SendIntAndChecksum(0x0508);  // product category
   rdm_sender.SendLongAndChecksum(SOFTWARE_VERSION);  // software version
-  //rdm_sender.SendIntAndChecksum(3);  // DMX footprint
-  rdm_sender.SendIntAndChecksum(0);  // DMX footprint
+  rdm_sender.SendIntAndChecksum(3);  // DMX footprint
   rdm_sender.SendIntAndChecksum(0x0101);  // DMX Personality
-  //rdm_sender.SendIntAndChecksum(dmx_start_address);  // DMX Start Address
-  rdm_sender.SendIntAndChecksum(0xffff);  // DMX Start Address
+  rdm_sender.SendIntAndChecksum(WidgetSettings.StartAddress());  // DMX Start Address
   rdm_sender.SendIntAndChecksum(0);  // Sub device count
   rdm_sender.SendByteAndChecksum(0);  // Sensor Count
   rdm_sender.EndRDMResponse();
@@ -245,6 +244,23 @@ void HandleGetSoftwareVersion(byte *received_message) {
 
 
 /**
+ * Handle a GET DMX_START_ADDRESS request
+ */
+void HandleGetStartAddress(byte *received_message) {
+  if (received_message[23]) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  int start_address = WidgetSettings.StartAddress();
+  rdm_sender.StartRDMResponse(received_message,
+                              RDM_RESPONSE_ACK,
+                              sizeof(start_address));
+  rdm_sender.SendIntAndChecksum(start_address);
+  rdm_sender.EndRDMResponse();
+}
+
+/**
  * Handle a GET IDENTIFY_DEVICE request
  */
 void HandleGetIdentifyDevice(byte *received_message) {
@@ -256,6 +272,75 @@ void HandleGetIdentifyDevice(byte *received_message) {
   rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 1);
   rdm_sender.SendByteAndChecksum(identify_mode_enabled);
   rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a SET DMX_START_ADDRESS request
+ */
+void HandleSetLanguage(bool was_broadcast,
+                       int sub_device,
+                       byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] != 2) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  bool ok = true;
+  for (byte i = 0; i < sizeof(SUPPORTED_LANGUAGE) - 1; ++i) {
+    ok &= SUPPORTED_LANGUAGE[i] == received_message[24 + i];
+  }
+
+  if (!ok) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
+    rdm_sender.EndRDMResponse();
+  }
+}
+
+/**
+ * Handle a SET DMX_START_ADDRESS request
+ */
+void HandleSetStartAddress(bool was_broadcast,
+                           int sub_device,
+                           byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] != 2) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  int new_start_address = (((int) received_message[24] << 8) +
+                           received_message[25]);
+
+  if (new_start_address == 0 || new_start_address > 512) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  WidgetSettings.SetStartAddress(new_start_address);
+
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
+    rdm_sender.EndRDMResponse();
+  }
 }
 
 
@@ -327,8 +412,18 @@ void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
     case PID_DEVICE_INFO:
       HandleGetDeviceInfo(message);
       break;
+    case PID_LANGUAGE_CAPABILITIES:
+    case PID_LANGUAGE:
+      // these strings aren't null terminated
+      HandleStringRequest(message,
+                          SUPPORTED_LANGUAGE,
+                          sizeof(SUPPORTED_LANGUAGE) - 1);
+      break;
     case PID_SOFTWARE_VERSION_LABEL:
       HandleGetSoftwareVersion(message);
+      break;
+    case PID_DMX_START_ADDRESS:
+      HandleGetStartAddress(message);
       break;
     case PID_DEVICE_MODEL_DESCRIPTION:
       HandleStringRequest(message,
@@ -355,8 +450,13 @@ void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
 void HandleRDMSet(int param_id, bool is_broadcast, int sub_device,
                   byte *message) {
 
-
   switch (param_id) {
+    case PID_LANGUAGE:
+      HandleSetLanguage(is_broadcast, sub_device, message);
+      break;
+    case PID_DMX_START_ADDRESS:
+      HandleSetStartAddress(is_broadcast, sub_device, message);
+      break;
     case PID_IDENTIFY_DEVICE:
       HandleSetIdentifyDevice(is_broadcast, sub_device, message);
       break;

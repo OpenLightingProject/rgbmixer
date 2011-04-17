@@ -23,6 +23,52 @@
 #include "RDMSender.h"
 #include "WidgetSettings.h"
 
+void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
+                  const byte *message);
+void HandleRDMSet(int param_id, bool is_broadcast, int sub_device,
+                  const byte *message);
+
+// helper functions
+bool VerifyChecksum(const byte *message, int size);
+int ReadTemperatureSensor();
+void SendSensorResponse(const byte *received_message);
+void HandleStringRequest(const byte *received_message,
+                         char *label,
+                         byte label_size);
+
+// GET Handlers
+void HandleGetSupportedParameters(const byte *received_message);
+void HandleGetParameterDescription(const byte *received_message);
+void HandleGetDeviceInfo(const byte *received_message);
+void HandleGetProductDetailId(const byte *received_message);
+void HandleGetDeviceModelDescription(const byte *received_message);
+void HandleGetManufacturerLabel(const byte *received_message);
+void HandleGetDeviceLabel(const byte *received_message);
+void HandleGetLanguage(const byte *received_message);
+void HandleGetSoftwareVersion(const byte *received_message);
+void HandleGetStartAddress(const byte *received_message);
+void HandleGetSensorDefinition(const byte *received_message);
+void HandleGetSensorValue(const byte *received_message);
+void HandleGetDevicePowerCycles(const byte *received_message);
+void HandleGetIdentifyDevice(const byte *received_message);
+
+// SET Handlers
+void HandleSetLanguage(bool was_broadcast, int sub_device,
+                       const byte *received_message);
+void HandleSetDeviceLabel(bool was_broadcast, int sub_device,
+                          const byte *received_message);
+void HandleSetStartAddress(bool was_broadcast,
+                           int sub_device,
+                           const byte *received_message);
+void HandleSetSensorValue(bool was_broadcast, int sub_device,
+                          const byte *received_message);
+void HandleRecordSensor(bool was_broadcast, int sub_device,
+                        const byte *received_message);
+void HandleSetIdentifyDevice(bool was_broadcast, int sub_device,
+                             const byte *received_message);
+void HandleSetSerial(bool was_broadcast, int sub_device,
+                     const byte *received_message);
+
 // The definition for a PID, this includes which functions to call to handle
 // GET/SET requests and if we should include this PID in the list of
 // supported parameters.
@@ -535,7 +581,6 @@ void HandleSetSerial(bool was_broadcast,
 
 /**
  * Handle a GET request for a PID that returns a string
- *
  */
 void HandleStringRequest(const byte *received_message,
                          char *label,

@@ -23,19 +23,6 @@
 #include "RDMSender.h"
 #include "WidgetSettings.h"
 
-void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
-                  const byte *message);
-void HandleRDMSet(int param_id, bool is_broadcast, int sub_device,
-                  const byte *message);
-
-// helper functions
-bool VerifyChecksum(const byte *message, int size);
-int ReadTemperatureSensor();
-void SendSensorResponse(const byte *received_message);
-void HandleStringRequest(const byte *received_message,
-                         char *label,
-                         byte label_size);
-
 // GET Handlers
 void HandleGetSupportedParameters(const byte *received_message);
 void HandleGetParameterDescription(const byte *received_message);
@@ -127,6 +114,9 @@ bool identify_mode_enabled = false;
 RDMSender rdm_sender(&sender);
 
 
+/**
+ * Initialize the I/O pins used as part of the RDM responder.
+ */
 void SetupRDMHandling() {
   pinMode(IDENTIFY_LED_PIN, OUTPUT);
   digitalWrite(IDENTIFY_LED_PIN, identify_mode_enabled);
@@ -148,6 +138,47 @@ bool VerifyChecksum(const byte *message, int size) {
   byte checksum_offset = message[2];
   return (checksum >> 8 == message[checksum_offset] &&
           (checksum & 0xff) == message[checksum_offset + 1]);
+}
+
+
+/**
+ * Read the value of the temperature sensor.
+ * @return the temp in degrees C * 10
+ */
+int ReadTemperatureSensor() {
+  // v = input / 1024 * 5 V
+  // t = 100 * v
+  // we multiple the result by 10
+  return 10 * 5.0 * analogRead(TEMP_SENSOR_PIN) * 100.0 / 1024.0;
+}
+
+
+/**
+ * Send a sensor response, this is used for both PID_SENSOR_VALUE &
+ * PID_RECORD_SENSORS.
+ */
+void SendSensorResponse(const byte *received_message) {
+  rdm_sender.StartRDMAckResponse(received_message, 9);
+  rdm_sender.SendByteAndChecksum(received_message[24]);
+  rdm_sender.SendIntAndChecksum(ReadTemperatureSensor());  // current
+  rdm_sender.SendIntAndChecksum(0);  // lowest
+  rdm_sender.SendIntAndChecksum(0);  // highest
+  rdm_sender.SendIntAndChecksum(WidgetSettings.SensorValue());  // recorded
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Send a RDM message with a string as param data. Used for DEVICE_LABEL,
+ * MANUFACTURER_LABEL, etc.
+ */
+void HandleStringRequest(const byte *received_message,
+                         char *label,
+                         byte label_size) {
+  rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, label_size);
+  for (unsigned int i = 0; i < label_size; ++i)
+    rdm_sender.SendByteAndChecksum(label[i]);
+  rdm_sender.EndRDMResponse();
 }
 
 
@@ -313,26 +344,6 @@ void HandleGetSensorDefinition(const byte *received_message) {
   rdm_sender.SendByteAndChecksum(1);  // recorded value support
   for (unsigned int i = 0; i < sizeof(TEMPERATURE_SENSOR_DESCRIPTION) - 1; ++i)
     rdm_sender.SendByteAndChecksum(TEMPERATURE_SENSOR_DESCRIPTION[i]);
-  rdm_sender.EndRDMResponse();
-}
-
-
-int ReadTemperatureSensor() {
-  // v = input / 1024 * 5 V
-  // t = 100 * v
-  // we multiple the result by 10
-  return 10 * 5.0 * analogRead(TEMP_SENSOR_PIN) * 100.0 / 1024.0;
-}
-
-
-
-void SendSensorResponse(const byte *received_message) {
-  rdm_sender.StartRDMAckResponse(received_message, 9);
-  rdm_sender.SendByteAndChecksum(received_message[24]);
-  rdm_sender.SendIntAndChecksum(ReadTemperatureSensor());  // current
-  rdm_sender.SendIntAndChecksum(0);  // lowest
-  rdm_sender.SendIntAndChecksum(0);  // highest
-  rdm_sender.SendIntAndChecksum(WidgetSettings.SensorValue());  // recorded
   rdm_sender.EndRDMResponse();
 }
 
@@ -577,18 +588,6 @@ void HandleSetSerial(bool was_broadcast,
   } else {
     rdm_sender.SendEmptyAck(received_message);
   }
-}
-
-/**
- * Handle a GET request for a PID that returns a string
- */
-void HandleStringRequest(const byte *received_message,
-                         char *label,
-                         byte label_size) {
-  rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, label_size);
-  for (unsigned int i = 0; i < label_size; ++i)
-    rdm_sender.SendByteAndChecksum(label[i]);
-  rdm_sender.EndRDMResponse();
 }
 
 

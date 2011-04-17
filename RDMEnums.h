@@ -117,7 +117,9 @@ typedef enum {
   PID_LAMP_STRIKES = 0x0402,
   PID_LAMP_STATE =  0x0403,
   PID_LAMP_ON_MODE = 0x0404,
+  */
   PID_DEVICE_POWER_CYCLES = 0x0405,
+  /*
   // display settings
   PID_DISPLAY_INVERT = 0x0500,
   PID_DISPLAY_LEVEL = 0x0501,

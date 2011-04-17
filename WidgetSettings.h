@@ -46,6 +46,9 @@ class WidgetSettingsClass {
     byte DeviceLabel(char *label, byte length) const;
     void SetDeviceLabel(const char *new_label, byte length);
 
+    unsigned long DevicePowerCycles() const;
+    void IncrementDevicePowerCycles();
+
   private:
     static const int MAGIC_NUMBER;
     static const long DEFAULT_SERIAL_NUMBER;
@@ -55,13 +58,19 @@ class WidgetSettingsClass {
     static const byte MAGIC_NUMBER_OFFSET;
     static const byte START_ADDRESS_OFFSET;
     static const byte ESTA_ID_OFFSET;
+    static const byte SERIAL_NUMBER_OFFSET;
     static const byte DEVICE_LABEL_SIZE_OFFSET;
     static const byte DEVICE_LABEL_OFFSET;
+    static const byte DEVICE_POWER_CYCLES_OFFSET;
 
     unsigned int m_start_address;
 
+
     unsigned int ReadInt(unsigned int offset) const;
     void WriteInt(unsigned int offset, int data);
+
+    unsigned long ReadLong(unsigned long offset) const;
+    void WriteLong(unsigned long offset, long data);
 };
 
 extern WidgetSettingsClass WidgetSettings;

@@ -24,6 +24,7 @@
  *   serial number (4)
  *   device label size (2)
  *   device label (32)
+ *   device power cycles (4)
  */
 
 #include <EEPROM.h>
@@ -38,8 +39,10 @@ const byte WidgetSettingsClass::MAX_LABEL_LENGTH = 32;
 const byte WidgetSettingsClass::MAGIC_NUMBER_OFFSET = 0;
 const byte WidgetSettingsClass::START_ADDRESS_OFFSET = 2;
 const byte WidgetSettingsClass::ESTA_ID_OFFSET = 4;
+const byte WidgetSettingsClass::SERIAL_NUMBER_OFFSET = 6;
 const byte WidgetSettingsClass::DEVICE_LABEL_SIZE_OFFSET = 10;
 const byte WidgetSettingsClass::DEVICE_LABEL_OFFSET = 12;
+const byte WidgetSettingsClass::DEVICE_POWER_CYCLES_OFFSET = 44;
 
 /**
  * Check if the settings are valid and if not initialize them
@@ -54,9 +57,11 @@ void WidgetSettingsClass::Init() {
     SetEstaId(0x7a70);
     SetSerialNumber(DEFAULT_SERIAL_NUMBER);
     SetDeviceLabel(DEFAULT_LABEL, sizeof(DEFAULT_LABEL));
+    WriteLong(DEVICE_POWER_CYCLES_OFFSET, 0);
   } else {
     m_start_address = ReadInt(START_ADDRESS_OFFSET);
   }
+  IncrementDevicePowerCycles();
 }
 
 void WidgetSettingsClass::SetStartAddress(unsigned int start_address) {
@@ -84,20 +89,12 @@ bool WidgetSettingsClass::MatchesEstaId(byte *data) const {
 
 
 long WidgetSettingsClass::SerialNumber() const {
-  long serial = 0;
-  for (byte i = 0; i < sizeof(serial); ++i) {
-    serial = serial << 8;
-    serial += EEPROM.read(6 + i);
-  }
-  return serial;
+  return ReadLong(SERIAL_NUMBER_OFFSET);
 }
 
 
 void WidgetSettingsClass::SetSerialNumber(long serial_number) {
-  EEPROM.write(6, serial_number >> 24);
-  EEPROM.write(7, serial_number >> 16);
-  EEPROM.write(8, serial_number >> 8);
-  EEPROM.write(9, serial_number);
+  WriteLong(SERIAL_NUMBER_OFFSET, serial_number);
 }
 
 
@@ -132,6 +129,18 @@ void WidgetSettingsClass::SetDeviceLabel(const char *new_label,
 }
 
 
+unsigned long WidgetSettingsClass::DevicePowerCycles() const {
+  return ReadLong(DEVICE_POWER_CYCLES_OFFSET);
+}
+
+
+void WidgetSettingsClass::IncrementDevicePowerCycles() {
+  unsigned long l = ReadLong(DEVICE_POWER_CYCLES_OFFSET);
+  l++;
+  WriteLong(DEVICE_POWER_CYCLES_OFFSET, l);
+}
+
+
 unsigned int WidgetSettingsClass::ReadInt(unsigned int offset) const {
   return (EEPROM.read(offset) << 8) + EEPROM.read(offset + 1);
 }
@@ -140,6 +149,19 @@ unsigned int WidgetSettingsClass::ReadInt(unsigned int offset) const {
 void WidgetSettingsClass::WriteInt(unsigned int offset, int data) {
   EEPROM.write(offset, data >> 8);
   EEPROM.write(offset + 1, data);
+}
+
+unsigned long WidgetSettingsClass::ReadLong(unsigned long offset) const {
+  unsigned long l = ReadInt(offset);
+  l = l << 16;
+  l += ReadInt(offset + 2);
+  return l;
+}
+
+
+void WidgetSettingsClass::WriteLong(unsigned long offset, long data) {
+  WriteInt(offset, data >> 16);
+  WriteInt(offset + 2, data);
 }
 
 WidgetSettingsClass WidgetSettings;

@@ -52,7 +52,7 @@ char SUPPORTED_LANGUAGE[] = "en";
 unsigned long SOFTWARE_VERSION = 1;
 char SOFTWARE_VERSION_STRING[] = "1.0";
 unsigned int SUPPORTED_PARAMETERS[] = {0x0080, 0x0081, 0x0082, 0x00a0, 0x00b0,
-                                       0x8000};
+                                       0x0405, 0x8000};
 const int MAX_DMX_ADDRESS = 512;
 enum { MAX_LABEL_SIZE = 32 };
 const char SET_SERIAL_PID_DESCRIPTION[] = "Set Serial Number";
@@ -317,6 +317,25 @@ void HandleGetStartAddress(byte *received_message) {
   rdm_sender.EndRDMResponse();
 }
 
+
+/**
+ * Handle a GET DEVICE_POWER_CYCLES request
+ */
+void HandleGetDevicePowerCycles(byte *received_message) {
+  if (received_message[23]) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  unsigned long power_cycles = WidgetSettings.DevicePowerCycles();
+  rdm_sender.StartRDMResponse(received_message,
+                              RDM_RESPONSE_ACK,
+                              sizeof(power_cycles));
+  rdm_sender.SendLongAndChecksum(power_cycles);
+  rdm_sender.EndRDMResponse();
+}
+
+
 /**
  * Handle a GET IDENTIFY_DEVICE request
  */
@@ -561,6 +580,9 @@ void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
     case PID_DMX_START_ADDRESS:
       HandleGetStartAddress(message);
       break;
+    case PID_DEVICE_POWER_CYCLES:
+      HandleGetDevicePowerCycles(message);
+      break;
     case PID_IDENTIFY_DEVICE:
       HandleGetIdentifyDevice(message);
       break;
@@ -585,6 +607,10 @@ void HandleRDMSet(int param_id, bool is_broadcast, int sub_device,
       break;
     case PID_DMX_START_ADDRESS:
       HandleSetStartAddress(is_broadcast, sub_device, message);
+      break;
+    case PID_DEVICE_POWER_CYCLES:
+      rdm_sender.NackOrBroadcast(is_broadcast, message,
+                                 NR_UNSUPPORTED_COMMAND_CLASS);
       break;
     case PID_IDENTIFY_DEVICE:
       HandleSetIdentifyDevice(is_broadcast, sub_device, message);

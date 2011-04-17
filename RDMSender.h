@@ -35,19 +35,25 @@ class RDMSender {
 
     void ReturnRDMErrorResponse(byte error_code) const;
 
-    void StartRDMResponse(byte *received_message,
+    void StartRDMResponse(const byte *received_message,
                           rdm_response_type response_type,
                           unsigned int param_data_size) const;
+    void StartRDMAckResponse(const byte *received_message,
+                             unsigned int param_data_size) const;
     void SendByteAndChecksum(byte b) const;
     void SendIntAndChecksum(int i) const;
     void SendLongAndChecksum(long l) const;
     void EndRDMResponse() const;
 
+    // helper method to send acks
+    void SendEmptyAck(const byte *received_message) const;
+
     // helper method to send nacks
-    void SendNack(byte *received_message, rdm_nack_reason nack_reason) const;
+    void SendNack(const byte *received_message,
+                  rdm_nack_reason nack_reason) const;
     // helper method to either send a nack, or a broadcast response code
     void NackOrBroadcast(bool was_broadcast,
-                         byte *received_message,
+                         const byte *received_message,
                          rdm_nack_reason nack_reason) const;
 
   private:

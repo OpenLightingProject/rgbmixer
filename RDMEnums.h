@@ -23,7 +23,6 @@
 #ifndef RDMENUMS_H
 #define RDMENUMS_H
 
-
 // RDM Status Codes. These are used to communicate the state of a request back
 // to the host.
 typedef enum {

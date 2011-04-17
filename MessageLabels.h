@@ -15,7 +15,7 @@
  *
  * MessageLabels.h
  * Copyright (C) 2011 Simon Newton
- * Contains the message labels to identify packets.
+ * Contains the message labels used to identify packets.
  */
 
 #include "WProgram.h"

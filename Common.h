@@ -14,7 +14,8 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
  * Common.h
- * Copyright (C) 2010 Simon Newton
+ * Copyright (C) 2011 Simon Newton
+ * Contains constants used by both the RDM code and the main responder code.
  */
 
 #ifndef COMMON_H

@@ -51,11 +51,16 @@ const byte LED_PIN = 13;
 const byte PWM_PINS[] = {3, 5, 6, 9, 10, 11};
 
 // device setting
-byte DEVICE_PARAMS[] = {0, 1, 0, 0, 40};
-byte DEVICE_ID[] = {1, 0};
+const byte DEVICE_PARAMS[] = {0, 1, 0, 0, 40};
+const byte DEVICE_ID[] = {1, 0};
 
+// global state
 byte led_state = LOW;  // flash the led when we get data.
 
+
+/**
+ * Send the Serial Number response
+ */
 void SendSerialNumberResponse() {
   long serial = WidgetSettings.SerialNumber();
   sender.SendMessageHeader(SERIAL_NUMBER_LABEL, sizeof(serial));
@@ -64,6 +69,9 @@ void SendSerialNumberResponse() {
 }
 
 
+/**
+ * Send the device id / name response
+ */
 void SendDeviceResponse() {
   sender.SendMessageHeader(NAME_LABEL,
                            sizeof(DEVICE_ID) + sizeof(DEVICE_NAME));
@@ -73,6 +81,9 @@ void SendDeviceResponse() {
 }
 
 
+/**
+ * Send the manufacturer id / name response
+ */
 void SendManufacturerResponse() {
   int esta_id = WidgetSettings.EstaId();
   sender.SendMessageHeader(MANUFACTURER_LABEL,
@@ -85,22 +96,26 @@ void SendManufacturerResponse() {
 }
 
 
-/*
- * Write the DMX values to the PWM pins
- * @param data the dmx data buffer
- * @param size the size of the dmx buffer
+/**
+ * Write the DMX values to the PWM pins.
+ * @param data the dmx data buffer.
+ * @param size the size of the dmx buffer.
  */
-void SetPWM(byte data[], unsigned int size) {
+void SetPWM(const byte data[], unsigned int size) {
   unsigned int start_address = WidgetSettings.StartAddress() - 1;
   for (byte i = 0; i < sizeof(PWM_PINS) && start_address + i < size; ++i) {
     analogWrite(PWM_PINS[i], data[start_address + i]);
   }
 }
 
+
 /*
- * Called when a full message is recieved from the host
+ * Called when a full message is recieved from the host.
+ * @param label the message label.
+ * @param message the array of bytes that make up the message.
+ * @param message_size the size of the message.
  */
-void TakeAction(byte label, byte *message, unsigned int message_size) {
+void TakeAction(byte label, const byte *message, unsigned int message_size) {
   switch (label) {
     case PARAMETERS_LABEL:
       // Widget Parameters request
@@ -109,10 +124,9 @@ void TakeAction(byte label, byte *message, unsigned int message_size) {
                           DEVICE_PARAMS);
       break;
     case DMX_DATA_LABEL:
-      // Dmx Data
       if (message[0] == 0) {
         // 0 start code
-        led_state = ! led_state;
+        led_state = !led_state;
         digitalWrite(LED_PIN, led_state);
         SetPWM(&message[1], message_size);
        }
@@ -133,15 +147,17 @@ void TakeAction(byte label, byte *message, unsigned int message_size) {
 }
 
 
+/**
+ * Setup the i/o pins correctly
+ */
 void setup() {
-  for(byte i = 0; i < sizeof(PWM_PINS); i++) {
+  for (byte i = 0; i < sizeof(PWM_PINS); i++) {
     pinMode(PWM_PINS[i], OUTPUT);
     analogWrite(PWM_PINS[i], 0);
   }
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, led_state);
   SetupRDMHandling();
-
   WidgetSettings.Init();
 }
 

@@ -36,12 +36,12 @@ class WidgetSettingsClass {
     int EstaId() const;
     void SetEstaId(int esta_id);
     // helper method to compare an array of bytes against the esta id
-    bool MatchesEstaId(byte *data) const;
+    bool MatchesEstaId(const byte *data) const;
 
     long SerialNumber() const;
     void SetSerialNumber(long serial_number);
     // helper method to compare an array of bytes against the serial #
-    bool MatchesSerialNumber(byte *data) const;
+    bool MatchesSerialNumber(const byte *data) const;
 
     byte DeviceLabel(char *label, byte length) const;
     void SetDeviceLabel(const char *new_label, byte length);
@@ -68,7 +68,6 @@ class WidgetSettingsClass {
     static const byte SENSOR_0_RECORDED_VALUE;
 
     unsigned int m_start_address;
-
 
     unsigned int ReadInt(unsigned int offset) const;
     void WriteInt(unsigned int offset, int data);

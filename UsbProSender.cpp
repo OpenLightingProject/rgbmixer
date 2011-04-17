@@ -44,7 +44,8 @@ void UsbProSender::SendMessageFooter() const {
  * @param size the length of the data
  * @param data the data buffer
  */
-void UsbProSender::WriteMessage(byte label, int size, byte data[]) const {
+void UsbProSender::WriteMessage(byte label, int size,
+                                const byte data[]) const {
   SendMessageHeader(label, size);
   Serial.write(data, size);
   SendMessageFooter();

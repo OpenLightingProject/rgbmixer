@@ -82,7 +82,7 @@ void WidgetSettingsClass::SetEstaId(int esta_id) {
 }
 
 
-bool WidgetSettingsClass::MatchesEstaId(byte *data) const {
+bool WidgetSettingsClass::MatchesEstaId(const byte *data) const {
   bool match = true;
   for (byte i = 0; i < sizeof(long); ++i) {
     match &= EEPROM.read(ESTA_ID_OFFSET + i) == data[i];
@@ -101,7 +101,7 @@ void WidgetSettingsClass::SetSerialNumber(long serial_number) {
 }
 
 
-bool WidgetSettingsClass::MatchesSerialNumber(byte *data) const {
+bool WidgetSettingsClass::MatchesSerialNumber(const byte *data) const {
   bool match = true;
   for (byte i = 0; i < sizeof(long); ++i) {
     match &= EEPROM.read(6 + i) == data[i];

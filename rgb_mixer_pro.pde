@@ -51,8 +51,8 @@ char MANUFACTURER_NAME[] = "Open Lighting";
 char SUPPORTED_LANGUAGE[] = "en";
 unsigned long SOFTWARE_VERSION = 1;
 char SOFTWARE_VERSION_STRING[] = "1.0";
-unsigned int SUPPORTED_PARAMETERS[] = {0x0080, 0x0081, 0x0082, 0x00a0, 0x00b0,
-                                       0x0405, 0x8000};
+unsigned int SUPPORTED_PARAMETERS[] = {0x0070, 0x0080, 0x0081, 0x0082, 0x00a0,
+                                       0x00b0, 0x0405, 0x8000};
 const int MAX_DMX_ADDRESS = 512;
 enum { MAX_LABEL_SIZE = 32 };
 const char SET_SERIAL_PID_DESCRIPTION[] = "Set Serial Number";
@@ -267,6 +267,21 @@ void HandleGetDeviceInfo(byte *received_message) {
   rdm_sender.SendIntAndChecksum(WidgetSettings.StartAddress());  // DMX Start Address
   rdm_sender.SendIntAndChecksum(0);  // Sub device count
   rdm_sender.SendByteAndChecksum(0);  // Sensor Count
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET PRODUCT_DETAIL_ID request
+ */
+void HandleProductDetailId(byte *received_message) {
+  if (received_message[23]) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 2);
+  rdm_sender.SendIntAndChecksum(0x0403);  // PWM dimmer
   rdm_sender.EndRDMResponse();
 }
 
@@ -553,6 +568,9 @@ void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
       break;
     case PID_DEVICE_INFO:
       HandleGetDeviceInfo(message);
+      break;
+    case PID_PRODUCT_DETAIL_ID_LIST:
+      HandleProductDetailId(message);
       break;
     case PID_DEVICE_MODEL_DESCRIPTION:
       HandleStringRequest(message,

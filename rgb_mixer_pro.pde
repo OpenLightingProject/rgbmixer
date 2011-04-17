@@ -371,9 +371,31 @@ void HandleGetSensorDefinition(byte *received_message) {
   rdm_sender.SendIntAndChecksum(1500);  // range max
   rdm_sender.SendIntAndChecksum(100);  // normal min
   rdm_sender.SendIntAndChecksum(400);  // normal max
-  rdm_sender.SendByteAndChecksum(0);  // no recorded value support
+  rdm_sender.SendByteAndChecksum(1);  // recorded value support
   for (unsigned int i = 0; i < sizeof(TEMPERATURE_SENSOR_DESCRIPTION) - 1; ++i)
     rdm_sender.SendByteAndChecksum(TEMPERATURE_SENSOR_DESCRIPTION[i]);
+  rdm_sender.EndRDMResponse();
+}
+
+
+int ReadTemperatureSensor() {
+  // v = input / 1024 * 5 V
+  // t = 100 * v
+  // we multiple the result by 10
+  return 10 * 5.0 * analogRead(TEMP_SENSOR_PIN) * 100.0 / 1024.0;
+}
+
+
+
+void SendSensorResponse(byte *received_message) {
+  rdm_sender.StartRDMResponse(received_message,
+                              RDM_RESPONSE_ACK,
+                              9);
+  rdm_sender.SendByteAndChecksum(received_message[24]);
+  rdm_sender.SendIntAndChecksum(ReadTemperatureSensor());  // current
+  rdm_sender.SendIntAndChecksum(0);  // lowest
+  rdm_sender.SendIntAndChecksum(0);  // highest
+  rdm_sender.SendIntAndChecksum(WidgetSettings.SensorValue());  // recorded
   rdm_sender.EndRDMResponse();
 }
 
@@ -392,20 +414,7 @@ void HandleGetSensorValue(byte *received_message) {
     return;
   }
 
-  // v = input / 1024 * 5 V
-  // t = 100 * v
-  // we multiple the result by 10
-  int temp = 10 * 5.0 * analogRead(TEMP_SENSOR_PIN) * 100.0 / 1024.0;
-
-  rdm_sender.StartRDMResponse(received_message,
-                              RDM_RESPONSE_ACK,
-                              9);
-  rdm_sender.SendByteAndChecksum(received_message[24]);
-  rdm_sender.SendIntAndChecksum(temp);  // curren
-  rdm_sender.SendIntAndChecksum(0);  // lowest
-  rdm_sender.SendIntAndChecksum(0);  // highest
-  rdm_sender.SendIntAndChecksum(0);  // recorded
-  rdm_sender.EndRDMResponse();
+  SendSensorResponse(received_message);
 }
 
 
@@ -535,6 +544,62 @@ void HandleSetStartAddress(bool was_broadcast,
     rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
     rdm_sender.EndRDMResponse();
   }
+}
+
+
+/**
+ * Handle a SET SENSOR_VALUE request
+ */
+void HandleSetSensorValue(bool was_broadcast,
+                          int sub_device,
+                          byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] != 1) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  if (received_message[24] && received_message[24] != 0xff) {
+    rdm_sender.SendNack(received_message, NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  WidgetSettings.SaveSensorValue(0);
+  SendSensorResponse(received_message);
+}
+
+
+/*
+ * Handle a SET RECORD_SENSORS request
+ */
+void HandleRecordSensor(bool was_broadcast,
+                        int sub_device,
+                        byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] != 1) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  if (received_message[24] && received_message[24] != 0xff) {
+    rdm_sender.NackOrBroadcast(was_broadcast, received_message,
+                               NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  WidgetSettings.SaveSensorValue(ReadTemperatureSensor());
+
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
+    rdm_sender.EndRDMResponse();
+  }
+
 }
 
 
@@ -680,6 +745,10 @@ void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
     case PID_SENSOR_VALUE:
       HandleGetSensorValue(message);
       break;
+    case PID_RECORD_SENSORS:
+      rdm_sender.NackOrBroadcast(is_broadcast, message,
+                                 NR_UNSUPPORTED_COMMAND_CLASS);
+      break;
     case PID_DEVICE_POWER_CYCLES:
       HandleGetDevicePowerCycles(message);
       break;
@@ -707,6 +776,12 @@ void HandleRDMSet(int param_id, bool is_broadcast, int sub_device,
       break;
     case PID_DMX_START_ADDRESS:
       HandleSetStartAddress(is_broadcast, sub_device, message);
+      break;
+    case PID_SENSOR_VALUE:
+      HandleSetSensorValue(is_broadcast, sub_device, message);
+      break;
+    case PID_RECORD_SENSORS:
+      HandleRecordSensor(is_broadcast, sub_device, message);
       break;
     case PID_DEVICE_POWER_CYCLES:
       rdm_sender.NackOrBroadcast(is_broadcast, message,

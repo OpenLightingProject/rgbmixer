@@ -25,6 +25,7 @@
  *   device label size (2)
  *   device label (32)
  *   device power cycles (4)
+ *   sensor 0 recorded value (2)
  */
 
 #include <EEPROM.h>
@@ -43,6 +44,7 @@ const byte WidgetSettingsClass::SERIAL_NUMBER_OFFSET = 6;
 const byte WidgetSettingsClass::DEVICE_LABEL_SIZE_OFFSET = 10;
 const byte WidgetSettingsClass::DEVICE_LABEL_OFFSET = 12;
 const byte WidgetSettingsClass::DEVICE_POWER_CYCLES_OFFSET = 44;
+const byte WidgetSettingsClass::SENSOR_0_RECORDED_VALUE = 46;
 
 /**
  * Check if the settings are valid and if not initialize them
@@ -58,6 +60,7 @@ void WidgetSettingsClass::Init() {
     SetSerialNumber(DEFAULT_SERIAL_NUMBER);
     SetDeviceLabel(DEFAULT_LABEL, sizeof(DEFAULT_LABEL));
     WriteLong(DEVICE_POWER_CYCLES_OFFSET, 0);
+    SaveSensorValue(0);
   } else {
     m_start_address = ReadInt(START_ADDRESS_OFFSET);
   }
@@ -131,6 +134,16 @@ void WidgetSettingsClass::SetDeviceLabel(const char *new_label,
 
 unsigned long WidgetSettingsClass::DevicePowerCycles() const {
   return ReadLong(DEVICE_POWER_CYCLES_OFFSET);
+}
+
+
+int WidgetSettingsClass::SensorValue() const {
+  return ReadInt(SENSOR_0_RECORDED_VALUE);
+}
+
+
+void WidgetSettingsClass::SaveSensorValue(int value) {
+  WriteInt(SENSOR_0_RECORDED_VALUE, value);
 }
 
 

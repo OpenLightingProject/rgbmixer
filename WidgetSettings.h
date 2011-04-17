@@ -49,6 +49,9 @@ class WidgetSettingsClass {
     unsigned long DevicePowerCycles() const;
     void IncrementDevicePowerCycles();
 
+    int SensorValue() const;
+    void SaveSensorValue(int value);
+
   private:
     static const int MAGIC_NUMBER;
     static const long DEFAULT_SERIAL_NUMBER;
@@ -62,6 +65,7 @@ class WidgetSettingsClass {
     static const byte DEVICE_LABEL_SIZE_OFFSET;
     static const byte DEVICE_LABEL_OFFSET;
     static const byte DEVICE_POWER_CYCLES_OFFSET;
+    static const byte SENSOR_0_RECORDED_VALUE;
 
     unsigned int m_start_address;
 

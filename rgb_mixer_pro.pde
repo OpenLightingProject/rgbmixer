@@ -42,6 +42,7 @@
 const byte LED_PIN = 13;
 const byte IDENTIFY_LED_PIN = 12;
 const byte PWM_PINS[] = {3, 5, 6, 9, 10, 11};
+const byte TEMP_SENSOR_PIN = 0;
 
 
 byte DEVICE_PARAMS[] = {0, 1, 0, 0, 40};
@@ -51,11 +52,23 @@ char MANUFACTURER_NAME[] = "Open Lighting";
 char SUPPORTED_LANGUAGE[] = "en";
 unsigned long SOFTWARE_VERSION = 1;
 char SOFTWARE_VERSION_STRING[] = "1.0";
-unsigned int SUPPORTED_PARAMETERS[] = {0x0070, 0x0080, 0x0081, 0x0082, 0x00a0,
-                                       0x00b0, 0x0405, 0x8000};
+unsigned int SUPPORTED_PARAMETERS[] = {
+  PID_PRODUCT_DETAIL_ID_LIST,
+  PID_DEVICE_MODEL_DESCRIPTION,
+  PID_DEVICE_LABEL,
+  PID_MANUFACTURER_LABEL,
+  PID_LANGUAGE_CAPABILITIES,
+  PID_LANGUAGE,
+  PID_SENSOR_DEFINITION,
+  PID_SENSOR_VALUE,
+  PID_RECORD_SENSORS,
+  PID_DEVICE_POWER_CYCLES,
+  PID_MANUFACTURER_SET_SERIAL,
+};
 const int MAX_DMX_ADDRESS = 512;
 enum { MAX_LABEL_SIZE = 32 };
 const char SET_SERIAL_PID_DESCRIPTION[] = "Set Serial Number";
+const char TEMPERATURE_SENSOR_DESCRIPTION[] = "Case Temperature";
 
 byte led_state = LOW;  // flash the led when we get data.
 
@@ -266,7 +279,7 @@ void HandleGetDeviceInfo(byte *received_message) {
   rdm_sender.SendIntAndChecksum(0x0101);  // DMX Personality
   rdm_sender.SendIntAndChecksum(WidgetSettings.StartAddress());  // DMX Start Address
   rdm_sender.SendIntAndChecksum(0);  // Sub device count
-  rdm_sender.SendByteAndChecksum(0);  // Sensor Count
+  rdm_sender.SendByteAndChecksum(1);  // Sensor Count
   rdm_sender.EndRDMResponse();
 }
 
@@ -329,6 +342,69 @@ void HandleGetStartAddress(byte *received_message) {
                               RDM_RESPONSE_ACK,
                               sizeof(start_address));
   rdm_sender.SendIntAndChecksum(start_address);
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET SENSOR_DEFINITION request
+ */
+void HandleGetSensorDefinition(byte *received_message) {
+  if (received_message[23] != 1) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  if (received_message[24]) {
+    rdm_sender.SendNack(received_message, NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  rdm_sender.StartRDMResponse(received_message,
+                              RDM_RESPONSE_ACK,
+                              13 + sizeof(TEMPERATURE_SENSOR_DESCRIPTION) - 1);
+  rdm_sender.SendByteAndChecksum(received_message[24]);
+  rdm_sender.SendByteAndChecksum(0x00);  // type: temperature
+  rdm_sender.SendByteAndChecksum(1);  // unit: C
+  rdm_sender.SendByteAndChecksum(1);  // prefix: deci
+  rdm_sender.SendIntAndChecksum(0);  // range min
+  rdm_sender.SendIntAndChecksum(1500);  // range max
+  rdm_sender.SendIntAndChecksum(100);  // normal min
+  rdm_sender.SendIntAndChecksum(400);  // normal max
+  rdm_sender.SendByteAndChecksum(0);  // no recorded value support
+  for (unsigned int i = 0; i < sizeof(TEMPERATURE_SENSOR_DESCRIPTION) - 1; ++i)
+    rdm_sender.SendByteAndChecksum(TEMPERATURE_SENSOR_DESCRIPTION[i]);
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET SENSOR_VALUE request
+ */
+void HandleGetSensorValue(byte *received_message) {
+  if (received_message[23] != 1) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  if (received_message[24]) {
+    rdm_sender.SendNack(received_message, NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  // v = input / 1024 * 5 V
+  // t = 100 * v
+  // we multiple the result by 10
+  int temp = 10 * 5.0 * analogRead(TEMP_SENSOR_PIN) * 100.0 / 1024.0;
+
+  rdm_sender.StartRDMResponse(received_message,
+                              RDM_RESPONSE_ACK,
+                              9);
+  rdm_sender.SendByteAndChecksum(received_message[24]);
+  rdm_sender.SendIntAndChecksum(temp);  // curren
+  rdm_sender.SendIntAndChecksum(0);  // lowest
+  rdm_sender.SendIntAndChecksum(0);  // highest
+  rdm_sender.SendIntAndChecksum(0);  // recorded
   rdm_sender.EndRDMResponse();
 }
 
@@ -597,6 +673,12 @@ void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
       break;
     case PID_DMX_START_ADDRESS:
       HandleGetStartAddress(message);
+      break;
+    case PID_SENSOR_DEFINITION:
+      HandleGetSensorDefinition(message);
+      break;
+    case PID_SENSOR_VALUE:
+      HandleGetSensorValue(message);
       break;
     case PID_DEVICE_POWER_CYCLES:
       HandleGetDevicePowerCycles(message);

@@ -41,8 +41,8 @@ UPLOAD_RATE = 57600
 AVRDUDE_PROGRAMMER = stk500
 MCU = atmega328p
 F_CPU = 16000000
-SOURCES = EEPROM.cpp RDMSender.cpp UsbProReceiver.cpp UsbProSender.cpp \
-          WidgetSettings.cpp
+SOURCES = EEPROM.cpp RDMHandlers.cpp RDMSender.cpp UsbProReceiver.cpp \
+          UsbProSender.cpp WidgetSettings.cpp
 
 ############################################################################
 # Below here nothing should be changed...

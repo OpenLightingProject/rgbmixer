@@ -1,0 +1,746 @@
+/*
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU Library General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *
+ * RDMHandlers.cpp
+ * Copyright (C) 2011 Simon Newton
+ */
+
+#include "Common.h"
+#include "RDMHandlers.h"
+#include "MessageLabels.h"
+#include "RDMEnums.h"
+#include "RDMSender.h"
+#include "WidgetSettings.h"
+
+// Pin constants
+const byte IDENTIFY_LED_PIN = 12;
+const byte TEMP_SENSOR_PIN = 0;
+
+
+char SUPPORTED_LANGUAGE[] = "en";
+unsigned long SOFTWARE_VERSION = 1;
+char SOFTWARE_VERSION_STRING[] = "1.0";
+unsigned int SUPPORTED_PARAMETERS[] = {
+  PID_PRODUCT_DETAIL_ID_LIST,
+  PID_DEVICE_MODEL_DESCRIPTION,
+  PID_DEVICE_LABEL,
+  PID_MANUFACTURER_LABEL,
+  PID_LANGUAGE_CAPABILITIES,
+  PID_LANGUAGE,
+  PID_SENSOR_DEFINITION,
+  PID_SENSOR_VALUE,
+  PID_RECORD_SENSORS,
+  PID_DEVICE_POWER_CYCLES,
+  PID_MANUFACTURER_SET_SERIAL,
+};
+const int MAX_DMX_ADDRESS = 512;
+enum { MAX_LABEL_SIZE = 32 };
+const char SET_SERIAL_PID_DESCRIPTION[] = "Set Serial Number";
+const char TEMPERATURE_SENSOR_DESCRIPTION[] = "Case Temperature";
+
+bool identify_mode_enabled = false;
+
+// global objects
+RDMSender rdm_sender(&sender);
+
+
+void SetupRDMHandling() {
+  pinMode(IDENTIFY_LED_PIN, OUTPUT);
+  digitalWrite(IDENTIFY_LED_PIN, identify_mode_enabled);
+}
+
+
+/**
+ * Verify a RDM checksum
+ * @param message a pointer to an RDM message starting with the SUB_START_CODE
+ * @param size the size of the message data
+ * @return true if the checksum is ok, false otherwise
+ */
+bool VerifyChecksum(byte *message, int size) {
+  // don't checksum the checksum itself (last two bytes)
+  unsigned int checksum = 0;
+  for (int i = 0; i < size - 2; i++)
+    checksum += message[i];
+
+  byte checksum_offset = message[2];
+  return (checksum >> 8 == message[checksum_offset] &&
+          (checksum & 0xff) == message[checksum_offset + 1]);
+}
+
+
+/**
+ * Handle a GET SUPPORTED_PARAMETERS request
+ */
+void HandleGetSupportedParameters(byte *received_message) {
+  if (received_message[23]) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  rdm_sender.StartRDMResponse(received_message,
+                              RDM_RESPONSE_ACK,
+                              sizeof(SUPPORTED_PARAMETERS));
+  for (byte i = 0; i < sizeof(SUPPORTED_PARAMETERS) / sizeof(int); ++i) {
+    rdm_sender.SendIntAndChecksum(SUPPORTED_PARAMETERS[i]);
+  }
+
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET PARAMETER_DESCRIPTION request
+ */
+void HandleGetParameterDescription(byte *received_message) {
+  if (received_message[23] != 2) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  unsigned int param_id = (((unsigned int) received_message[24] << 8) +
+                           received_message[25]);
+
+  if (param_id != 0x8000) {
+    rdm_sender.SendNack(received_message, NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK,
+                              20 + sizeof(SET_SERIAL_PID_DESCRIPTION) - 1);
+  rdm_sender.SendIntAndChecksum(0x8000);
+  rdm_sender.SendByteAndChecksum(4);  // pdl size
+  rdm_sender.SendByteAndChecksum(0x03);  // data type, uint8
+  rdm_sender.SendByteAndChecksum(0x02);  // command class, set only
+  rdm_sender.SendByteAndChecksum(0);  // type
+  rdm_sender.SendByteAndChecksum(0);  // unit, none
+  rdm_sender.SendByteAndChecksum(0);  // prefix, none
+  rdm_sender.SendLongAndChecksum(0);  // min
+  rdm_sender.SendLongAndChecksum(0xfffffffe);  // max
+  rdm_sender.SendLongAndChecksum(1);  // default
+
+  for (unsigned int i = 0; i < sizeof(SET_SERIAL_PID_DESCRIPTION) - 1; ++i)
+    rdm_sender.SendByteAndChecksum(SET_SERIAL_PID_DESCRIPTION[i]);
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET DEVICE_INFO request
+ */
+void HandleGetDeviceInfo(byte *received_message) {
+  if (received_message[23]) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 19);
+  rdm_sender.SendIntAndChecksum(256);  // protocol version
+  rdm_sender.SendIntAndChecksum(2);  // device model
+  rdm_sender.SendIntAndChecksum(0x0508);  // product category
+  rdm_sender.SendLongAndChecksum(SOFTWARE_VERSION);  // software version
+  rdm_sender.SendIntAndChecksum(3);  // DMX footprint
+  rdm_sender.SendIntAndChecksum(0x0101);  // DMX Personality
+  rdm_sender.SendIntAndChecksum(WidgetSettings.StartAddress());  // DMX Start Address
+  rdm_sender.SendIntAndChecksum(0);  // Sub device count
+  rdm_sender.SendByteAndChecksum(1);  // Sensor Count
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET PRODUCT_DETAIL_ID request
+ */
+void HandleProductDetailId(byte *received_message) {
+  if (received_message[23]) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 2);
+  rdm_sender.SendIntAndChecksum(0x0403);  // PWM dimmer
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET DEVICE_LABEL request
+ */
+void HandleGetDeviceLabel(byte *received_message) {
+  char device_label[MAX_LABEL_SIZE];
+  byte size = WidgetSettings.DeviceLabel(device_label, sizeof(device_label));
+
+  HandleStringRequest(received_message, device_label, size);
+}
+
+
+/**
+ * Handle a GET SOFTWARE_VERSION_LABEL request
+ */
+void HandleGetSoftwareVersion(byte *received_message) {
+  if (received_message[23]) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  rdm_sender.StartRDMResponse(received_message,
+                   RDM_RESPONSE_ACK,
+                   sizeof(SOFTWARE_VERSION_STRING));
+  for (unsigned int i = 0; i < sizeof(SOFTWARE_VERSION_STRING); ++i)
+    rdm_sender.SendByteAndChecksum(SOFTWARE_VERSION_STRING[i]);
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET DMX_START_ADDRESS request
+ */
+void HandleGetStartAddress(byte *received_message) {
+  if (received_message[23]) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  int start_address = WidgetSettings.StartAddress();
+  rdm_sender.StartRDMResponse(received_message,
+                              RDM_RESPONSE_ACK,
+                              sizeof(start_address));
+  rdm_sender.SendIntAndChecksum(start_address);
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET SENSOR_DEFINITION request
+ */
+void HandleGetSensorDefinition(byte *received_message) {
+  if (received_message[23] != 1) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  if (received_message[24]) {
+    rdm_sender.SendNack(received_message, NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  rdm_sender.StartRDMResponse(received_message,
+                              RDM_RESPONSE_ACK,
+                              13 + sizeof(TEMPERATURE_SENSOR_DESCRIPTION) - 1);
+  rdm_sender.SendByteAndChecksum(received_message[24]);
+  rdm_sender.SendByteAndChecksum(0x00);  // type: temperature
+  rdm_sender.SendByteAndChecksum(1);  // unit: C
+  rdm_sender.SendByteAndChecksum(1);  // prefix: deci
+  rdm_sender.SendIntAndChecksum(0);  // range min
+  rdm_sender.SendIntAndChecksum(1500);  // range max
+  rdm_sender.SendIntAndChecksum(100);  // normal min
+  rdm_sender.SendIntAndChecksum(400);  // normal max
+  rdm_sender.SendByteAndChecksum(1);  // recorded value support
+  for (unsigned int i = 0; i < sizeof(TEMPERATURE_SENSOR_DESCRIPTION) - 1; ++i)
+    rdm_sender.SendByteAndChecksum(TEMPERATURE_SENSOR_DESCRIPTION[i]);
+  rdm_sender.EndRDMResponse();
+}
+
+
+int ReadTemperatureSensor() {
+  // v = input / 1024 * 5 V
+  // t = 100 * v
+  // we multiple the result by 10
+  return 10 * 5.0 * analogRead(TEMP_SENSOR_PIN) * 100.0 / 1024.0;
+}
+
+
+
+void SendSensorResponse(byte *received_message) {
+  rdm_sender.StartRDMResponse(received_message,
+                              RDM_RESPONSE_ACK,
+                              9);
+  rdm_sender.SendByteAndChecksum(received_message[24]);
+  rdm_sender.SendIntAndChecksum(ReadTemperatureSensor());  // current
+  rdm_sender.SendIntAndChecksum(0);  // lowest
+  rdm_sender.SendIntAndChecksum(0);  // highest
+  rdm_sender.SendIntAndChecksum(WidgetSettings.SensorValue());  // recorded
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET SENSOR_VALUE request
+ */
+void HandleGetSensorValue(byte *received_message) {
+  if (received_message[23] != 1) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  if (received_message[24]) {
+    rdm_sender.SendNack(received_message, NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  SendSensorResponse(received_message);
+}
+
+
+/**
+ * Handle a GET DEVICE_POWER_CYCLES request
+ */
+void HandleGetDevicePowerCycles(byte *received_message) {
+  if (received_message[23]) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  unsigned long power_cycles = WidgetSettings.DevicePowerCycles();
+  rdm_sender.StartRDMResponse(received_message,
+                              RDM_RESPONSE_ACK,
+                              sizeof(power_cycles));
+  rdm_sender.SendLongAndChecksum(power_cycles);
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET IDENTIFY_DEVICE request
+ */
+void HandleGetIdentifyDevice(byte *received_message) {
+  if (received_message[23]) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 1);
+  rdm_sender.SendByteAndChecksum(identify_mode_enabled);
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a SET DMX_START_ADDRESS request
+ */
+void HandleSetLanguage(bool was_broadcast,
+                       int sub_device,
+                       byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] != 2) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  bool ok = true;
+  for (byte i = 0; i < sizeof(SUPPORTED_LANGUAGE) - 1; ++i) {
+    ok &= SUPPORTED_LANGUAGE[i] == received_message[24 + i];
+  }
+
+  if (!ok) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
+    rdm_sender.EndRDMResponse();
+  }
+}
+
+
+/**
+ * Handle a SET DMX_START_ADDRESS request
+ */
+void HandleSetDeviceLabel(bool was_broadcast,
+                          int sub_device,
+                          byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] > MAX_LABEL_SIZE) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  WidgetSettings.SetDeviceLabel((char*) received_message + 24,
+                                received_message[23]);
+
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
+    rdm_sender.EndRDMResponse();
+  }
+}
+
+
+/**
+ * Handle a SET DMX_START_ADDRESS request
+ */
+void HandleSetStartAddress(bool was_broadcast,
+                           int sub_device,
+                           byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] != 2) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  int new_start_address = (((int) received_message[24] << 8) +
+                           received_message[25]);
+
+  if (new_start_address == 0 || new_start_address > MAX_DMX_ADDRESS) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  WidgetSettings.SetStartAddress(new_start_address);
+
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
+    rdm_sender.EndRDMResponse();
+  }
+}
+
+
+/**
+ * Handle a SET SENSOR_VALUE request
+ */
+void HandleSetSensorValue(bool was_broadcast,
+                          int sub_device,
+                          byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] != 1) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  if (received_message[24] && received_message[24] != 0xff) {
+    rdm_sender.SendNack(received_message, NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  WidgetSettings.SaveSensorValue(0);
+  SendSensorResponse(received_message);
+}
+
+
+/*
+ * Handle a SET RECORD_SENSORS request
+ */
+void HandleRecordSensor(bool was_broadcast,
+                        int sub_device,
+                        byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] != 1) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  if (received_message[24] && received_message[24] != 0xff) {
+    rdm_sender.NackOrBroadcast(was_broadcast, received_message,
+                               NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  WidgetSettings.SaveSensorValue(ReadTemperatureSensor());
+
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
+    rdm_sender.EndRDMResponse();
+  }
+
+}
+
+
+/**
+ * Handle a SET IDENTIFY_DEVICE request
+ */
+void HandleSetIdentifyDevice(bool was_broadcast,
+                             int sub_device,
+                             byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] != 1 ||
+      (received_message[24] != 0 && received_message[24] != 1)) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  identify_mode_enabled = received_message[24];
+  digitalWrite(IDENTIFY_LED_PIN, identify_mode_enabled);
+
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
+    rdm_sender.EndRDMResponse();
+  }
+}
+
+
+/**
+ * Handle a SET SERIAL_NUMBER request
+ */
+void HandleSetSerial(bool was_broadcast,
+                     int sub_device,
+                     byte *received_message) {
+  if (received_message[23] != 4) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  unsigned long new_serial_number = 0;
+  for (byte i = 0; i < 4; ++i) {
+    new_serial_number = new_serial_number << 8;
+    new_serial_number += received_message[24 + i];
+  }
+
+  if (new_serial_number == 0xffffffff) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  WidgetSettings.SetSerialNumber(new_serial_number);
+
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, 0);
+    rdm_sender.EndRDMResponse();
+  }
+}
+
+/**
+ * Handle a GET request for a PID that returns a string
+ *
+ */
+void HandleStringRequest(byte *received_message,
+                         char *label,
+                         byte label_size) {
+  if (received_message[23]) {
+    rdm_sender.SendNack(received_message, NR_FORMAT_ERROR);
+    return;
+  }
+
+  rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, label_size);
+  for (unsigned int i = 0; i < label_size; ++i)
+    rdm_sender.SendByteAndChecksum(label[i]);
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle an RDM GET request
+ */
+void HandleRDMGet(int param_id, bool is_broadcast, int sub_device,
+                  byte *message) {
+  if (is_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+    return;
+  }
+
+  if (sub_device) {
+    rdm_sender.SendNack(message, NR_SUB_DEVICE_OUT_OF_RANGE);
+    return;
+  }
+
+  switch (param_id) {
+    case PID_SUPPORTED_PARAMETERS:
+      HandleGetSupportedParameters(message);
+      break;
+    case PID_PARAMETER_DESCRIPTION:
+      HandleGetParameterDescription(message);
+      break;
+    case PID_DEVICE_INFO:
+      HandleGetDeviceInfo(message);
+      break;
+    case PID_PRODUCT_DETAIL_ID_LIST:
+      HandleProductDetailId(message);
+      break;
+    case PID_DEVICE_MODEL_DESCRIPTION:
+      HandleStringRequest(message,
+                          DEVICE_NAME,
+                          DEVICE_NAME_SIZE);
+      break;
+    case PID_MANUFACTURER_LABEL:
+      HandleStringRequest(message,
+                          MANUFACTURER_NAME,
+                          MANUFACTURER_NAME_SIZE);
+      break;
+    case PID_DEVICE_LABEL:
+      HandleGetDeviceLabel(message);
+      break;
+    case PID_LANGUAGE_CAPABILITIES:
+    case PID_LANGUAGE:
+      // these strings aren't null terminated
+      HandleStringRequest(message,
+                          SUPPORTED_LANGUAGE,
+                          sizeof(SUPPORTED_LANGUAGE) - 1);
+      break;
+    case PID_SOFTWARE_VERSION_LABEL:
+      HandleGetSoftwareVersion(message);
+      break;
+    case PID_DMX_START_ADDRESS:
+      HandleGetStartAddress(message);
+      break;
+    case PID_SENSOR_DEFINITION:
+      HandleGetSensorDefinition(message);
+      break;
+    case PID_SENSOR_VALUE:
+      HandleGetSensorValue(message);
+      break;
+    case PID_RECORD_SENSORS:
+      rdm_sender.NackOrBroadcast(is_broadcast, message,
+                                 NR_UNSUPPORTED_COMMAND_CLASS);
+      break;
+    case PID_DEVICE_POWER_CYCLES:
+      HandleGetDevicePowerCycles(message);
+      break;
+    case PID_IDENTIFY_DEVICE:
+      HandleGetIdentifyDevice(message);
+      break;
+    default:
+      rdm_sender.NackOrBroadcast(is_broadcast, message, NR_UNKNOWN_PID);
+  }
+}
+
+
+/**
+ * Handle an RDM SET request
+ */
+void HandleRDMSet(int param_id, bool is_broadcast, int sub_device,
+                  byte *message) {
+
+  switch (param_id) {
+    case PID_LANGUAGE:
+      HandleSetLanguage(is_broadcast, sub_device, message);
+      break;
+    case PID_DEVICE_LABEL:
+      HandleSetDeviceLabel(is_broadcast, sub_device, message);
+      break;
+    case PID_DMX_START_ADDRESS:
+      HandleSetStartAddress(is_broadcast, sub_device, message);
+      break;
+    case PID_SENSOR_VALUE:
+      HandleSetSensorValue(is_broadcast, sub_device, message);
+      break;
+    case PID_RECORD_SENSORS:
+      HandleRecordSensor(is_broadcast, sub_device, message);
+      break;
+    case PID_DEVICE_POWER_CYCLES:
+      rdm_sender.NackOrBroadcast(is_broadcast, message,
+                                 NR_UNSUPPORTED_COMMAND_CLASS);
+      break;
+    case PID_IDENTIFY_DEVICE:
+      HandleSetIdentifyDevice(is_broadcast, sub_device, message);
+      break;
+    case PID_MANUFACTURER_SET_SERIAL:
+      HandleSetSerial(is_broadcast, sub_device, message);
+      break;
+    default:
+      rdm_sender.NackOrBroadcast(is_broadcast, message, NR_UNKNOWN_PID);
+  }
+}
+
+
+/*
+ * Handle an RDM message
+ * @param message pointer to a RDM message where the first byte is the sub star
+ * code.
+ * @param size the size of the message data.
+ */
+void HandleRDMMessage(byte *message, int size) {
+  // check for a packet that is too small, an invalid start / sub start code
+  // or a mismatched message length.
+  if (size < MINIMUM_RDM_PACKET_SIZE || message[0] != START_CODE ||
+      message[1] != SUB_START_CODE || message[2] != size - 2) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_FAILED);
+    return;
+  }
+
+  if (!VerifyChecksum(message, size)) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_FAILED_CHECKSUM);
+    return;
+  }
+
+  // true if this is broadcast or vendorcast, in which case we don't return a
+  // RDM message
+  bool is_broadcast = true;
+  for (int i = 5; i <= 8; ++i) {
+    is_broadcast &= (message[i] == 0xff);
+  }
+
+  int expected_esta_id = message[3];
+  expected_esta_id  = expected_esta_id << 8;
+  expected_esta_id += message[4];
+
+  bool to_us = is_broadcast || (
+    WidgetSettings.MatchesEstaId(message + 3) &&
+    WidgetSettings.MatchesSerialNumber(message + 5));
+
+  if (!to_us) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_INVALID_DESTINATION);
+    return;
+  }
+
+  // check the command class
+  byte command_class = message[20];
+  if (command_class != GET_COMMAND && command_class != SET_COMMAND) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_INVALID_COMMAND);
+  }
+
+  // check sub devices
+  unsigned int sub_device = (message[18] << 8) + message[19];
+  if (sub_device != 0 && sub_device != 0xffff) {
+    // respond with nack
+    rdm_sender.NackOrBroadcast(is_broadcast,
+                               message,
+                               NR_SUB_DEVICE_OUT_OF_RANGE);
+    return;
+  }
+
+  unsigned int param_id = (message[21] << 8) + message[22];
+
+  byte data[] = {RDM_STATUS_OK};
+  if (is_broadcast) {
+    data[0] = RDM_STATUS_BROADCAST;
+  }
+
+  if (command_class == GET_COMMAND) {
+    HandleRDMGet(param_id, is_broadcast, sub_device, message);
+    return;
+  } else  {
+    HandleRDMSet(param_id, is_broadcast, sub_device, message);
+  }
+}

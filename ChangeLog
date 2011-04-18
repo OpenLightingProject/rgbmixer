@@ -1,0 +1,15 @@
+17/5/2011 Simon Newton <nomis52@gmail.com>
+  * Updated to support RDM
+
+25/3/2010 Simon Newton <nomis52@gmail.com>
+  *  Changed to LSB order for the device & esta id
+
+16/3/2010 Simon Newton <nomis52@gmail.com>
+  *  Add support for the USB Pro Protocol Extensions
+
+13/2/2010 Simon Newton <nomis52@gmail.com>
+  *  Support for additional PWM pins
+
+7/2/2010 Simon Newton <nomis52@gmail.com>
+  *   Initial Release.
+

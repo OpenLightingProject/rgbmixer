@@ -15,20 +15,8 @@
  *
  * RGB Color Mixer
  * Copyright (C) 2010 Simon Newton
- * A Simple RGB mixer that behaves like a DMX USB Pro.
+ * An RGB mixer that behaves like a DMX USB Pro.
  * http://opendmx.net/index.php/Arduino_RGB_Mixer
- *
- * 25/3/2010
- *  Changed to LSB order for the device & esta id
- *
- * 16/3/2010:
- *  Add support for the USB Pro Protocol Extensions
- *
- * 13/2/2010:
- *  Support for additional PWM pins
- *
- * 7/2/2010:
- *   Initial Release.
  */
 
 #include "Common.h"

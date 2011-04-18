@@ -51,6 +51,8 @@ void HandleSetSensorValue(bool was_broadcast, int sub_device,
                           const byte *received_message);
 void HandleRecordSensor(bool was_broadcast, int sub_device,
                         const byte *received_message);
+void HandleSetDevicePowerCycles(bool was_broadcast, int sub_device,
+                                const byte *received_message);
 void HandleSetIdentifyDevice(bool was_broadcast, int sub_device,
                              const byte *received_message);
 void HandleSetSerial(bool was_broadcast, int sub_device,
@@ -87,7 +89,8 @@ pid_definition PID_DEFINITIONS[] = {
   {PID_SENSOR_DEFINITION, HandleGetSensorDefinition, NULL, 1, true},
   {PID_SENSOR_VALUE, HandleGetSensorValue, HandleSetSensorValue, 1, true},
   {PID_RECORD_SENSORS, NULL, HandleRecordSensor, 0, true},
-  {PID_DEVICE_POWER_CYCLES, HandleGetDevicePowerCycles, NULL, 0, true},
+  {PID_DEVICE_POWER_CYCLES, HandleGetDevicePowerCycles,
+   HandleSetDevicePowerCycles, 0, true},
   {PID_IDENTIFY_DEVICE, HandleGetIdentifyDevice, HandleSetIdentifyDevice,
    0, false},
   {PID_MANUFACTURER_SET_SERIAL, NULL, HandleSetSerial, 4, true},
@@ -528,6 +531,35 @@ void HandleRecordSensor(bool was_broadcast,
   }
 }
 
+
+/**
+ * Handle a SET DEVICE_POWER_CYCLES request
+ */
+void HandleSetDevicePowerCycles(bool was_broadcast,
+                                int sub_device,
+                                const byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] != 4) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  unsigned long power_cycles = 0;
+  for (byte i = 0; i < 4; ++i) {
+    power_cycles = power_cycles << 8;
+    power_cycles += received_message[24 + i];
+  }
+
+  WidgetSettings.SetDevicePowerCycles(power_cycles);
+
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.SendEmptyAck(received_message);
+  }
+}
 
 /**
  * Handle a SET IDENTIFY_DEVICE request

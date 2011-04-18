@@ -47,6 +47,7 @@ class WidgetSettingsClass {
     void SetDeviceLabel(const char *new_label, byte length);
 
     unsigned long DevicePowerCycles() const;
+    void SetDevicePowerCycles(unsigned long count);
     void IncrementDevicePowerCycles();
 
     int SensorValue() const;

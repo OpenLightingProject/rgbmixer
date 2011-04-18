@@ -59,7 +59,7 @@ void WidgetSettingsClass::Init() {
     SetEstaId(0x7a70);
     SetSerialNumber(DEFAULT_SERIAL_NUMBER);
     SetDeviceLabel(DEFAULT_LABEL, sizeof(DEFAULT_LABEL));
-    WriteLong(DEVICE_POWER_CYCLES_OFFSET, 0);
+    SetDevicePowerCycles(0);
     SaveSensorValue(0);
   } else {
     m_start_address = ReadInt(START_ADDRESS_OFFSET);
@@ -137,6 +137,11 @@ unsigned long WidgetSettingsClass::DevicePowerCycles() const {
 }
 
 
+void WidgetSettingsClass::SetDevicePowerCycles(unsigned long count) {
+  WriteLong(DEVICE_POWER_CYCLES_OFFSET, count);
+}
+
+
 int WidgetSettingsClass::SensorValue() const {
   return ReadInt(SENSOR_0_RECORDED_VALUE);
 }
@@ -148,9 +153,7 @@ void WidgetSettingsClass::SaveSensorValue(int value) {
 
 
 void WidgetSettingsClass::IncrementDevicePowerCycles() {
-  unsigned long l = ReadLong(DEVICE_POWER_CYCLES_OFFSET);
-  l++;
-  WriteLong(DEVICE_POWER_CYCLES_OFFSET, l);
+  SetDevicePowerCycles(DevicePowerCycles() + 1);
 }
 
 

@@ -28,7 +28,7 @@
  *   sensor 0 recorded value (2)
  */
 
-#include <EEPROM.h>
+#include "EEPROM.h"
 #include "WidgetSettings.h"
 
 

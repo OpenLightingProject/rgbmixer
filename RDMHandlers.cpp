@@ -33,6 +33,8 @@ void HandleGetManufacturerLabel(const byte *received_message);
 void HandleGetDeviceLabel(const byte *received_message);
 void HandleGetLanguage(const byte *received_message);
 void HandleGetSoftwareVersion(const byte *received_message);
+void HandleGetPersonality(const byte *received_message);
+void HandleGetPersonalityDescription(const byte *received_message);
 void HandleGetStartAddress(const byte *received_message);
 void HandleGetSensorDefinition(const byte *received_message);
 void HandleGetSensorValue(const byte *received_message);
@@ -43,6 +45,8 @@ void HandleGetIdentifyDevice(const byte *received_message);
 void HandleSetLanguage(bool was_broadcast, int sub_device,
                        const byte *received_message);
 void HandleSetDeviceLabel(bool was_broadcast, int sub_device,
+                          const byte *received_message);
+void HandleSetPersonality(bool was_broadcast, int sub_device,
                           const byte *received_message);
 void HandleSetStartAddress(bool was_broadcast,
                            int sub_device,
@@ -84,6 +88,9 @@ pid_definition PID_DEFINITIONS[] = {
   {PID_LANGUAGE_CAPABILITIES, HandleGetLanguage, NULL, 0, true},
   {PID_LANGUAGE, HandleGetLanguage, HandleSetLanguage, 0, true},
   {PID_SOFTWARE_VERSION_LABEL, HandleGetSoftwareVersion, NULL, 0, false},
+  {PID_DMX_PERSONALITY, HandleGetPersonality, HandleSetPersonality, 0, true},
+  {PID_DMX_PERSONALITY_DESCRIPTION, HandleGetPersonalityDescription, NULL, 1,
+   true},
   {PID_DMX_START_ADDRESS, HandleGetStartAddress, HandleSetStartAddress, 0,
    false},
   {PID_SENSOR_DEFINITION, HandleGetSensorDefinition, NULL, 1, true},
@@ -96,6 +103,19 @@ pid_definition PID_DEFINITIONS[] = {
   {PID_MANUFACTURER_SET_SERIAL, NULL, HandleSetSerial, 4, true},
 };
 
+
+// personalities
+typedef struct {
+  byte personality_number;
+  byte slots;
+  const char *description;
+} rdm_personality;
+
+rdm_personality rdm_personalities[] = {
+  {1, 6, "6x PWM"},
+  {2, 6, "3x inverted PWM, 3x PWM"},
+  {3, 6, "6x inverted PWM"},
+};
 
 // Pin constants
 const byte IDENTIFY_LED_PIN = 12;
@@ -244,8 +264,13 @@ void HandleGetDeviceInfo(const byte *received_message) {
   rdm_sender.SendIntAndChecksum(2);  // device model
   rdm_sender.SendIntAndChecksum(0x0508);  // product category
   rdm_sender.SendLongAndChecksum(SOFTWARE_VERSION);  // software version
-  rdm_sender.SendIntAndChecksum(3);  // DMX footprint
-  rdm_sender.SendIntAndChecksum(0x0101);  // DMX Personality
+
+  byte personality = WidgetSettings.Personality();
+  rdm_sender.SendIntAndChecksum(rdm_personalities[personality - 1].slots);
+  // current personality
+  rdm_sender.SendByteAndChecksum(personality);
+  rdm_sender.SendByteAndChecksum(sizeof(rdm_personalities) /
+                                 sizeof(rdm_personality));
   // DMX Start Address
   rdm_sender.SendIntAndChecksum(WidgetSettings.StartAddress());
   rdm_sender.SendIntAndChecksum(0);  // Sub device count
@@ -309,6 +334,42 @@ void HandleGetSoftwareVersion(const byte *received_message) {
                                  sizeof(SOFTWARE_VERSION_STRING));
   for (unsigned int i = 0; i < sizeof(SOFTWARE_VERSION_STRING); ++i)
     rdm_sender.SendByteAndChecksum(SOFTWARE_VERSION_STRING[i]);
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET DMX_PERSONALITY request
+ */
+void HandleGetPersonality(const byte *received_message) {
+  rdm_sender.StartRDMAckResponse(received_message, 2);
+  rdm_sender.SendByteAndChecksum(WidgetSettings.Personality());
+  rdm_sender.SendByteAndChecksum(sizeof(rdm_personalities) /
+                                 sizeof(rdm_personality));
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET DMX_PERSONALITY_DESCRIPTION request
+ */
+void HandleGetPersonalityDescription(const byte *received_message) {
+  byte max_personalities = sizeof(rdm_personalities) / sizeof(rdm_personality);
+  byte personality_number = received_message[24];
+
+  if (personality_number == 0 || personality_number > max_personalities) {
+    rdm_sender.SendNack(received_message, NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  rdm_personality *personality = &rdm_personalities[personality_number - 1];
+  unsigned int description_length = strlen(personality->description);
+
+  rdm_sender.StartRDMAckResponse(received_message, 3 + description_length);
+  rdm_sender.SendByteAndChecksum(personality_number);
+  rdm_sender.SendIntAndChecksum(personality->slots);
+  for (unsigned int i = 0; i < description_length; ++i)
+    rdm_sender.SendByteAndChecksum(personality->description[i]);
   rdm_sender.EndRDMResponse();
 }
 
@@ -436,6 +497,38 @@ void HandleSetDeviceLabel(bool was_broadcast,
   WidgetSettings.SetDeviceLabel((char*) received_message + 24,
                                 received_message[23]);
 
+  if (was_broadcast) {
+    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+  } else {
+    rdm_sender.SendEmptyAck(received_message);
+  }
+}
+
+
+/**
+ * Handle a SET DMX_PERSONALITY request
+ */
+void HandleSetPersonality(bool was_broadcast,
+                          int sub_device,
+                          const byte *received_message) {
+  // check for invalid size or value
+  if (received_message[23] != 1) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_FORMAT_ERROR);
+    return;
+  }
+
+  if (received_message[24] == 0 ||
+      received_message[24] >
+      sizeof(rdm_personalities) / sizeof(rdm_personality)) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_DATA_OUT_OF_RANGE);
+    return;
+  }
+
+  WidgetSettings.SetPersonality(received_message[24]);
   if (was_broadcast) {
     rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
   } else {

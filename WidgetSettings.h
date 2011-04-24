@@ -53,6 +53,9 @@ class WidgetSettingsClass {
     int SensorValue() const;
     void SaveSensorValue(int value);
 
+    byte Personality() const { return m_personality; }
+    void SetPersonality(byte value);
+
   private:
     static const int MAGIC_NUMBER;
     static const long DEFAULT_SERIAL_NUMBER;
@@ -67,8 +70,10 @@ class WidgetSettingsClass {
     static const byte DEVICE_LABEL_OFFSET;
     static const byte DEVICE_POWER_CYCLES_OFFSET;
     static const byte SENSOR_0_RECORDED_VALUE;
+    static const byte DMX_PERSONALITY_VALUE;
 
     unsigned int m_start_address;
+    byte m_personality;
 
     unsigned int ReadInt(unsigned int offset) const;
     void WriteInt(unsigned int offset, int data);

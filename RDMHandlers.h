@@ -23,6 +23,7 @@
 
 #include "WProgram.h"
 
+
 /**
  * Setup the RDM Handling
  */
@@ -35,5 +36,6 @@ void SetupRDMHandling();
  * @param size the size of the message data.
  */
 void HandleRDMMessage(const byte *message, int size);
+
 
 #endif  // RDM_HANDLERS_H

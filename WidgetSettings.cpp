@@ -26,13 +26,14 @@
  *   device label (32)
  *   device power cycles (4)
  *   sensor 0 recorded value (2)
+ *   dmx personality (1)
  */
 
 #include "EEPROM.h"
 #include "WidgetSettings.h"
 
 
-const int WidgetSettingsClass::MAGIC_NUMBER = 0x4f4c;
+const int WidgetSettingsClass::MAGIC_NUMBER = 0x4f4d;
 const long WidgetSettingsClass::DEFAULT_SERIAL_NUMBER = 1;
 const char WidgetSettingsClass::DEFAULT_LABEL[] = "Default Label";
 const byte WidgetSettingsClass::MAX_LABEL_LENGTH = 32;
@@ -45,6 +46,7 @@ const byte WidgetSettingsClass::DEVICE_LABEL_SIZE_OFFSET = 10;
 const byte WidgetSettingsClass::DEVICE_LABEL_OFFSET = 12;
 const byte WidgetSettingsClass::DEVICE_POWER_CYCLES_OFFSET = 44;
 const byte WidgetSettingsClass::SENSOR_0_RECORDED_VALUE = 46;
+const byte WidgetSettingsClass::DMX_PERSONALITY_VALUE = 48;
 
 /**
  * Check if the settings are valid and if not initialize them
@@ -61,8 +63,10 @@ void WidgetSettingsClass::Init() {
     SetDeviceLabel(DEFAULT_LABEL, sizeof(DEFAULT_LABEL));
     SetDevicePowerCycles(0);
     SaveSensorValue(0);
+    SetPersonality(1);
   } else {
     m_start_address = ReadInt(START_ADDRESS_OFFSET);
+    m_personality = EEPROM.read(DMX_PERSONALITY_VALUE);
   }
   IncrementDevicePowerCycles();
 }
@@ -149,6 +153,12 @@ int WidgetSettingsClass::SensorValue() const {
 
 void WidgetSettingsClass::SaveSensorValue(int value) {
   WriteInt(SENSOR_0_RECORDED_VALUE, value);
+}
+
+
+void WidgetSettingsClass::SetPersonality(byte value) {
+  EEPROM.write(DMX_PERSONALITY_VALUE, value);
+  m_personality = value;
 }
 
 

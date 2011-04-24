@@ -91,8 +91,14 @@ void SendManufacturerResponse() {
  */
 void SetPWM(const byte data[], unsigned int size) {
   unsigned int start_address = WidgetSettings.StartAddress() - 1;
+  byte personality = WidgetSettings.Personality();
+
   for (byte i = 0; i < sizeof(PWM_PINS) && start_address + i < size; ++i) {
-    analogWrite(PWM_PINS[i], data[start_address + i]);
+    byte value = data[start_address + i];
+    bool invert = false;
+    invert |= i < 3 && personality > 1;
+    invert |= i >= 3 && personality == 3;
+    analogWrite(PWM_PINS[i], invert ? 255 - value : value);
   }
 }
 
@@ -139,14 +145,22 @@ void TakeAction(byte label, const byte *message, unsigned int message_size) {
  * Setup the i/o pins correctly
  */
 void setup() {
+  WidgetSettings.Init();
+
+  byte personality = WidgetSettings.Personality();
+
+  // set the output pin levels according to the personality
   for (byte i = 0; i < sizeof(PWM_PINS); i++) {
     pinMode(PWM_PINS[i], OUTPUT);
-    analogWrite(PWM_PINS[i], 0);
+    bool invert = false;
+    invert |= i < 3 && personality > 1;
+    invert |= i >= 3 && personality == 3;
+    analogWrite(PWM_PINS[i], invert ? 255 : 0);
   }
+
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, led_state);
   SetupRDMHandling();
-  WidgetSettings.Init();
 }
 
 

@@ -661,11 +661,16 @@ void HandleSetIdentifyDevice(bool was_broadcast,
                              int sub_device,
                              const byte *received_message) {
   // check for invalid size or value
-  if (received_message[23] != 1 ||
-      (received_message[24] != 0 && received_message[24] != 1)) {
+  if (received_message[23] != 1) {
     rdm_sender.NackOrBroadcast(was_broadcast,
                                received_message,
                                NR_FORMAT_ERROR);
+    return;
+  }
+  if (received_message[24] != 0 && received_message[24] != 1) {
+    rdm_sender.NackOrBroadcast(was_broadcast,
+                               received_message,
+                               NR_DATA_OUT_OF_RANGE);
     return;
   }
 

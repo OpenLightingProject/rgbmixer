@@ -24,6 +24,7 @@
 #include "WidgetSettings.h"
 
 // GET Handlers
+void HandleGetQueuedMessage(const byte *received_message);
 void HandleGetSupportedParameters(const byte *received_message);
 void HandleGetParameterDescription(const byte *received_message);
 void HandleGetDeviceInfo(const byte *received_message);
@@ -77,6 +78,7 @@ typedef struct {
 
 // The list of all pids that we support
 pid_definition PID_DEFINITIONS[] = {
+  {PID_QUEUED_MESSAGE, HandleGetQueuedMessage, NULL, 1, true},
   {PID_SUPPORTED_PARAMETERS, HandleGetSupportedParameters, NULL, 0, false},
   {PID_PARAMETER_DESCRIPTION, HandleGetParameterDescription, NULL, 2, false},
   {PID_DEVICE_INFO, HandleGetDeviceInfo, NULL, 0, false},
@@ -201,6 +203,16 @@ void HandleStringRequest(const byte *received_message,
   rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, label_size);
   for (unsigned int i = 0; i < label_size; ++i)
     rdm_sender.SendByteAndChecksum(label[i]);
+  rdm_sender.EndRDMResponse();
+}
+
+
+/**
+ * Handle a GET QUEUED_MESSAGE request
+ */
+void HandleGetQueuedMessage(const byte *received_message) {
+  rdm_sender.StartCustomResponse(received_message, RDM_RESPONSE_ACK,
+      0, GET_COMMAND_RESPONSE, PID_STATUS_MESSAGES);
   rdm_sender.EndRDMResponse();
 }
 

@@ -50,6 +50,24 @@ void RDMSender::SendLongAndChecksum(long l) const {
 void RDMSender::StartRDMResponse(const byte *received_message,
                                  rdm_response_type response_type,
                                  unsigned int param_data_size) const {
+  word pid = received_message[21];
+  pid = (pid << 8) + received_message[22];
+
+  StartCustomResponse(
+      received_message,
+      response_type,
+      param_data_size,
+      received_message[20] == GET_COMMAND ?
+        GET_COMMAND_RESPONSE : SET_COMMAND_RESPONSE,
+      pid);
+}
+
+
+void RDMSender::StartCustomResponse(const byte *received_message,
+                                    rdm_response_type response_type,
+                                    unsigned int param_data_size,
+                                    byte command_class,
+                                    word pid) const {
   // set the global checksum to 0
   m_current_checksum = 0;
   // size is the rdm status code, the rdm header + the param_data_size
@@ -81,15 +99,11 @@ void RDMSender::StartRDMResponse(const byte *received_message,
   SendByteAndChecksum(received_message[19]);
 
   // command class
-  if (received_message[20] == GET_COMMAND) {
-    SendByteAndChecksum(GET_COMMAND_RESPONSE);
-  } else {
-    SendByteAndChecksum(SET_COMMAND_RESPONSE);
-  }
+  SendByteAndChecksum(command_class);
 
   // param id, we don't use queued messages so this always matches the request
-  SendByteAndChecksum(received_message[21]);
-  SendByteAndChecksum(received_message[22]);
+  SendByteAndChecksum(pid >> 8);
+  SendByteAndChecksum(pid);
   SendByteAndChecksum(param_data_size);
 }
 

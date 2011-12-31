@@ -38,6 +38,11 @@ class RDMSender {
     void StartRDMResponse(const byte *received_message,
                           rdm_response_type response_type,
                           unsigned int param_data_size) const;
+    void StartCustomResponse(const byte *received_message,
+                             rdm_response_type response_type,
+                             unsigned int param_data_size,
+                             byte command_class,
+                             word pid) const;
     void StartRDMAckResponse(const byte *received_message,
                              unsigned int param_data_size) const;
     void SendByteAndChecksum(byte b) const;
@@ -56,9 +61,11 @@ class RDMSender {
                          const byte *received_message,
                          rdm_nack_reason nack_reason) const;
 
+
   private:
     const UsbProSender *m_sender;
     mutable unsigned int m_current_checksum;
+
 };
 
 #endif  // RDM_SENDER_H

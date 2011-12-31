@@ -135,6 +135,9 @@ const char TEMPERATURE_SENSOR_DESCRIPTION[] = "Case Temperature";
 // The identify state
 bool identify_mode_enabled = false;
 
+bool device_label_pending = false;
+bool sent_device_label = false;
+
 // global objects
 RDMSender rdm_sender(&sender);
 
@@ -211,8 +214,21 @@ void HandleStringRequest(const byte *received_message,
  * Handle a GET QUEUED_MESSAGE request
  */
 void HandleGetQueuedMessage(const byte *received_message) {
-  rdm_sender.StartCustomResponse(received_message, RDM_RESPONSE_ACK,
-      0, GET_COMMAND_RESPONSE, PID_STATUS_MESSAGES);
+  if (device_label_pending) {
+    rdm_sender.DecrementMessageCount();
+    device_label_pending = false;
+    sent_device_label = true;
+    rdm_sender.StartCustomResponse(received_message, RDM_RESPONSE_ACK,
+        0, SET_COMMAND_RESPONSE, PID_DEVICE_LABEL);
+  } else if (sent_device_label && received_message[24] ==
+             STATUS_GET_LAST_MESSAGE) {
+    rdm_sender.StartCustomResponse(received_message, RDM_RESPONSE_ACK,
+        0, SET_COMMAND_RESPONSE, PID_DEVICE_LABEL);
+  } else {
+    sent_device_label = false;
+    rdm_sender.StartCustomResponse(received_message, RDM_RESPONSE_ACK,
+        0, GET_COMMAND_RESPONSE, PID_STATUS_MESSAGES);
+  }
   rdm_sender.EndRDMResponse();
 }
 
@@ -512,7 +528,10 @@ void HandleSetDeviceLabel(bool was_broadcast,
   if (was_broadcast) {
     rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
   } else {
-    rdm_sender.SendEmptyAck(received_message);
+    // 500ms should be more than enough time
+    rdm_sender.SendAckTimer(received_message, 5);
+    device_label_pending = true;
+    rdm_sender.IncrementMessageCount();
   }
 }
 

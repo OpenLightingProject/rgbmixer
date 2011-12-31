@@ -50,7 +50,7 @@ void RDMSender::SendLongAndChecksum(long l) const {
 void RDMSender::StartRDMResponse(const byte *received_message,
                                  rdm_response_type response_type,
                                  unsigned int param_data_size) const {
-  word pid = received_message[21];
+  int pid = received_message[21];
   pid = (pid << 8) + received_message[22];
 
   StartCustomResponse(
@@ -67,7 +67,7 @@ void RDMSender::StartCustomResponse(const byte *received_message,
                                     rdm_response_type response_type,
                                     unsigned int param_data_size,
                                     byte command_class,
-                                    word pid) const {
+                                    int pid) const {
   // set the global checksum to 0
   m_current_checksum = 0;
   // size is the rdm status code, the rdm header + the param_data_size
@@ -92,7 +92,7 @@ void RDMSender::StartCustomResponse(const byte *received_message,
 
   SendByteAndChecksum(received_message[15]);  // transaction #
   SendByteAndChecksum(response_type);  // response type
-  SendByteAndChecksum(0);  // message count
+  SendByteAndChecksum(m_message_count);  // message count
 
   // sub device
   SendByteAndChecksum(received_message[18]);
@@ -108,12 +108,18 @@ void RDMSender::StartCustomResponse(const byte *received_message,
 }
 
 
+/**
+ * Start an ACK response.
+ */
 void RDMSender::StartRDMAckResponse(const byte *received_message,
                                     unsigned int param_data_size) const {
   StartRDMResponse(received_message, RDM_RESPONSE_ACK, param_data_size);
 }
 
 
+/**
+ * Send the footer for an RDM response
+ */
 void RDMSender::EndRDMResponse() const {
   m_sender->Write(m_current_checksum >> 8);
   m_sender->Write(m_current_checksum);
@@ -121,8 +127,22 @@ void RDMSender::EndRDMResponse() const {
 }
 
 
+/**
+ * Send an ACK with no data.
+ */
 void RDMSender::SendEmptyAck(const byte *received_message) const {
   StartRDMAckResponse(received_message, 0);
+  EndRDMResponse();
+}
+
+
+/**
+ * Send an Ack Timer
+ */
+void RDMSender::SendAckTimer(const byte *received_message,
+                             int response_time) const {
+  StartRDMResponse(received_message, RDM_RESPONSE_ACK_TIMER, 2);
+  SendIntAndChecksum(response_time);
   EndRDMResponse();
 }
 
@@ -140,6 +160,9 @@ void RDMSender::SendNack(const byte *received_message,
 }
 
 
+/**
+ * Send a NACK or a 'was broadcast' response.
+ */
 void RDMSender::NackOrBroadcast(bool was_broadcast,
                                 const byte *received_message,
                                 rdm_nack_reason nack_reason) const {
@@ -147,4 +170,22 @@ void RDMSender::NackOrBroadcast(bool was_broadcast,
     ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
   else
     SendNack(received_message, nack_reason);
+}
+
+
+/**
+ * Increment the queued message count
+ */
+void RDMSender::IncrementMessageCount() {
+  if (m_message_count != 255)
+    m_message_count++;
+}
+
+
+/**
+ * Decrement the queued message count
+ */
+void RDMSender::DecrementMessageCount() {
+  if (m_message_count)
+    m_message_count--;
 }

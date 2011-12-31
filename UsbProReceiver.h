@@ -30,11 +30,13 @@ class UsbProReceiver {
   public:
     UsbProReceiver(void (*callback)(byte label,
                                     const byte *message,
-                                    unsigned int size));
+                                    unsigned int size),
+                   void (*idle_callback)());
     void Read();
 
   private:
     void (*m_callback)(byte label, const byte *message, unsigned int size);
+    void (*m_idle_callback)();
 
     // The receiving state
     typedef enum {

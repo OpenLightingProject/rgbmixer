@@ -27,7 +27,10 @@
  */
 class WidgetSettingsClass {
   public:
-    WidgetSettingsClass() {}
+    WidgetSettingsClass()
+        : m_label_pending(false),
+          m_label_size(0)
+    {}
     void Init();
 
     unsigned int StartAddress() const { return m_start_address; };
@@ -56,11 +59,14 @@ class WidgetSettingsClass {
     byte Personality() const { return m_personality; }
     void SetPersonality(byte value);
 
+    // perform any pending writes
+    bool PerformWrite();
+
   private:
     static const int MAGIC_NUMBER;
     static const long DEFAULT_SERIAL_NUMBER;
     static const char DEFAULT_LABEL[];
-    static const byte MAX_LABEL_LENGTH;
+    enum { MAX_LABEL_LENGTH = 32};
 
     static const byte MAGIC_NUMBER_OFFSET;
     static const byte START_ADDRESS_OFFSET;
@@ -74,6 +80,11 @@ class WidgetSettingsClass {
 
     unsigned int m_start_address;
     byte m_personality;
+
+    // background writing of the label
+    char m_label_buffer[MAX_LABEL_LENGTH];
+    bool m_label_pending;
+    byte m_label_size;
 
     unsigned int ReadInt(unsigned int offset) const;
     void WriteInt(unsigned int offset, int data);

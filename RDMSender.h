@@ -31,6 +31,7 @@ class RDMSender {
   public:
     explicit RDMSender(const UsbProSender *sender)
       : m_sender(sender),
+        m_message_count(0),
         m_current_checksum(0) {}
 
     void ReturnRDMErrorResponse(byte error_code) const;
@@ -42,7 +43,7 @@ class RDMSender {
                              rdm_response_type response_type,
                              unsigned int param_data_size,
                              byte command_class,
-                             word pid) const;
+                             int pid) const;
     void StartRDMAckResponse(const byte *received_message,
                              unsigned int param_data_size) const;
     void SendByteAndChecksum(byte b) const;
@@ -53,6 +54,10 @@ class RDMSender {
     // helper method to send acks
     void SendEmptyAck(const byte *received_message) const;
 
+    // helper method to send ack timers
+    void SendAckTimer(const byte *received_message,
+                      int response_time) const;
+
     // helper method to send nacks
     void SendNack(const byte *received_message,
                   rdm_nack_reason nack_reason) const;
@@ -61,11 +66,12 @@ class RDMSender {
                          const byte *received_message,
                          rdm_nack_reason nack_reason) const;
 
+    void IncrementMessageCount();
+    void DecrementMessageCount();
 
   private:
     const UsbProSender *m_sender;
+    byte m_message_count;
     mutable unsigned int m_current_checksum;
-
 };
-
 #endif  // RDM_SENDER_H

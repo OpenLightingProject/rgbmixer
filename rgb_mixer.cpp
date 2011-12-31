@@ -105,6 +105,15 @@ void SetPWM(const byte data[], unsigned int size) {
 }
 
 
+/**
+ * Called when there is no serial data
+ */
+void Idle() {
+  if (WidgetSettings.PerformWrite()) {
+    // Queue message here
+  }
+}
+
 /*
  * Called when a full message is recieved from the host.
  * @param label the message label.
@@ -146,11 +155,12 @@ void TakeAction(byte label, const byte *message, unsigned int message_size) {
 
 
 /**
- * Setup the i/o pins correctly
+ * The main function
  */
-void setup() {
-  WidgetSettings.Init();
+int main(void) {
+  init();
 
+  WidgetSettings.Init();
   byte personality = WidgetSettings.Personality();
 
   // set the output pin levels according to the personality
@@ -165,24 +175,9 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, led_state);
   SetupRDMHandling();
-}
 
-
-void loop() {
-  UsbProReceiver receiver(TakeAction);
+  UsbProReceiver receiver(TakeAction, Idle);
+  // this never returns
   receiver.Read();
+  return 0;
 }
-#include <WProgram.h>
-
-int main(void)
-{
-	init();
-
-	setup();
-    
-	for (;;)
-		loop();
-        
-	return 0;
-}
-

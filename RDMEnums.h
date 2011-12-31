@@ -49,7 +49,7 @@ typedef enum {
 
 typedef enum {
   RDM_RESPONSE_ACK = 0,
-  // RDM_RESPONSE_ACK_TIMER = 1,
+  RDM_RESPONSE_ACK_TIMER = 1,
   RDM_RESPONSE_NACK = 2,
   // RDM_RESONSE_ACK_OVERFLOW = 3,
 } rdm_response_type;
@@ -142,5 +142,11 @@ typedef enum {
   // Manufacturer PID follow
   PID_MANUFACTURER_SET_SERIAL = 0x8000,
 } rdm_pid;
+
+
+typedef enum {
+  STATUS_NONE = 0x0,
+  STATUS_GET_LAST_MESSAGE = 0x01,
+} rdm_status_type;
 
 #endif  // RDMENUMS_H

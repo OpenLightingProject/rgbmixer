@@ -22,8 +22,10 @@
 
 UsbProReceiver::UsbProReceiver(void (*callback)(byte label,
                                                 const byte *message,
-                                                unsigned int size)):
-    m_callback(callback) {
+                                                unsigned int size),
+                              void (*idle_callback)()):
+    m_callback(callback),
+    m_idle_callback(idle_callback) {
   Serial.begin(115200);  // fast baud rate, 9600 is too slow
 }
 
@@ -39,7 +41,9 @@ void UsbProReceiver::Read() {
   byte message[600];
 
   while (true) {
-    while (!Serial.available()) {}
+    while (!Serial.available()) {
+      m_idle_callback();
+    }
 
     byte data = Serial.read();
     switch (recv_mode) {

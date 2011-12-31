@@ -36,7 +36,6 @@
 const int WidgetSettingsClass::MAGIC_NUMBER = 0x4f4d;
 const long WidgetSettingsClass::DEFAULT_SERIAL_NUMBER = 1;
 const char WidgetSettingsClass::DEFAULT_LABEL[] = "Default Label";
-const byte WidgetSettingsClass::MAX_LABEL_LENGTH = 32;
 
 const byte WidgetSettingsClass::MAGIC_NUMBER_OFFSET = 0;
 const byte WidgetSettingsClass::START_ADDRESS_OFFSET = 2;
@@ -129,10 +128,9 @@ byte WidgetSettingsClass::DeviceLabel(char *label, byte length) const {
 void WidgetSettingsClass::SetDeviceLabel(const char *new_label,
                                          byte length) {
   byte size = min(MAX_LABEL_LENGTH, length);
-  for (byte i = 0; i < size; ++i) {
-    EEPROM.write(DEVICE_LABEL_OFFSET + i, new_label[i]);
-  }
-  WriteInt(DEVICE_LABEL_SIZE_OFFSET, size);
+  memcpy(m_label_buffer, new_label, size);
+  m_label_size = size;
+  m_label_pending = true;
 }
 
 
@@ -159,6 +157,19 @@ void WidgetSettingsClass::SaveSensorValue(int value) {
 void WidgetSettingsClass::SetPersonality(byte value) {
   EEPROM.write(DMX_PERSONALITY_VALUE, value);
   m_personality = value;
+}
+
+
+bool WidgetSettingsClass::PerformWrite() {
+  if (!m_label_pending)
+    return false;
+
+  for (byte i = 0; i < m_label_size; ++i) {
+    EEPROM.write(DEVICE_LABEL_OFFSET + i, m_label_buffer[i]);
+  }
+  WriteInt(DEVICE_LABEL_SIZE_OFFSET, m_label_size);
+  m_label_pending = false;
+  return true;
 }
 
 

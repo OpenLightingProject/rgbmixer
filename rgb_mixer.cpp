@@ -35,6 +35,7 @@ char MANUFACTURER_NAME[] = "Open Lighting";
 byte MANUFACTURER_NAME_SIZE = sizeof(MANUFACTURER_NAME);
 
 UsbProSender sender;
+RDMHandler rdm_handler(&sender);
 
 // Pin constants
 const byte LED_PIN = 13;
@@ -110,7 +111,7 @@ void SetPWM(const byte data[], unsigned int size) {
  */
 void Idle() {
   if (WidgetSettings.PerformWrite()) {
-    // Queue message here
+    rdm_handler.QueueSetDeviceLabel();
   }
 }
 
@@ -148,7 +149,7 @@ void TakeAction(byte label, const byte *message, unsigned int message_size) {
      case RDM_LABEL:
       led_state = !led_state;
       digitalWrite(LED_PIN, led_state);
-      HandleRDMMessage(message, message_size);
+      rdm_handler.HandleRDMMessage(message, message_size);
       break;
   }
 }
@@ -174,7 +175,6 @@ int main(void) {
 
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, led_state);
-  SetupRDMHandling();
 
   UsbProReceiver receiver(TakeAction, Idle);
   // this never returns

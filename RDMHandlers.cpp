@@ -23,132 +23,58 @@
 #include "RDMSender.h"
 #include "WidgetSettings.h"
 
-// GET Handlers
-void HandleGetQueuedMessage(const byte *received_message);
-void HandleGetSupportedParameters(const byte *received_message);
-void HandleGetParameterDescription(const byte *received_message);
-void HandleGetDeviceInfo(const byte *received_message);
-void HandleGetProductDetailId(const byte *received_message);
-void HandleGetDeviceModelDescription(const byte *received_message);
-void HandleGetManufacturerLabel(const byte *received_message);
-void HandleGetDeviceLabel(const byte *received_message);
-void HandleGetLanguage(const byte *received_message);
-void HandleGetSoftwareVersion(const byte *received_message);
-void HandleGetPersonality(const byte *received_message);
-void HandleGetPersonalityDescription(const byte *received_message);
-void HandleGetStartAddress(const byte *received_message);
-void HandleGetSensorDefinition(const byte *received_message);
-void HandleGetSensorValue(const byte *received_message);
-void HandleGetDevicePowerCycles(const byte *received_message);
-void HandleGetIdentifyDevice(const byte *received_message);
-
-// SET Handlers
-void HandleSetLanguage(bool was_broadcast, int sub_device,
-                       const byte *received_message);
-void HandleSetDeviceLabel(bool was_broadcast, int sub_device,
-                          const byte *received_message);
-void HandleSetPersonality(bool was_broadcast, int sub_device,
-                          const byte *received_message);
-void HandleSetStartAddress(bool was_broadcast,
-                           int sub_device,
-                           const byte *received_message);
-void HandleSetSensorValue(bool was_broadcast, int sub_device,
-                          const byte *received_message);
-void HandleRecordSensor(bool was_broadcast, int sub_device,
-                        const byte *received_message);
-void HandleSetDevicePowerCycles(bool was_broadcast, int sub_device,
-                                const byte *received_message);
-void HandleSetIdentifyDevice(bool was_broadcast, int sub_device,
-                             const byte *received_message);
-void HandleSetSerial(bool was_broadcast, int sub_device,
-                     const byte *received_message);
-
-// The definition for a PID, this includes which functions to call to handle
-// GET/SET requests and if we should include this PID in the list of
-// supported parameters.
-typedef struct {
-  unsigned int pid;
-  void (*get_handler)(const byte *message);
-  void (*set_handler)(bool was_broadcast, int sub_device,
-                      const byte *received_message);
-  byte get_argument_size;
-  bool include_in_supported_params;
-} pid_definition;
-
 
 // The list of all pids that we support
-pid_definition PID_DEFINITIONS[] = {
-  {PID_QUEUED_MESSAGE, HandleGetQueuedMessage, NULL, 1, true},
-  {PID_SUPPORTED_PARAMETERS, HandleGetSupportedParameters, NULL, 0, false},
-  {PID_PARAMETER_DESCRIPTION, HandleGetParameterDescription, NULL, 2, false},
-  {PID_DEVICE_INFO, HandleGetDeviceInfo, NULL, 0, false},
-  {PID_PRODUCT_DETAIL_ID_LIST, HandleGetProductDetailId, NULL, 0, true},
-  {PID_DEVICE_MODEL_DESCRIPTION, HandleGetDeviceModelDescription, NULL, 0,
-   true},
-  {PID_MANUFACTURER_LABEL, HandleGetManufacturerLabel, NULL, 0, true},
-  {PID_DEVICE_LABEL, HandleGetDeviceLabel, HandleSetDeviceLabel, 0, true},
-  {PID_LANGUAGE_CAPABILITIES, HandleGetLanguage, NULL, 0, true},
-  {PID_LANGUAGE, HandleGetLanguage, HandleSetLanguage, 0, true},
-  {PID_SOFTWARE_VERSION_LABEL, HandleGetSoftwareVersion, NULL, 0, false},
-  {PID_DMX_PERSONALITY, HandleGetPersonality, HandleSetPersonality, 0, true},
-  {PID_DMX_PERSONALITY_DESCRIPTION, HandleGetPersonalityDescription, NULL, 1,
-   true},
-  {PID_DMX_START_ADDRESS, HandleGetStartAddress, HandleSetStartAddress, 0,
-   false},
-  {PID_SENSOR_DEFINITION, HandleGetSensorDefinition, NULL, 1, true},
-  {PID_SENSOR_VALUE, HandleGetSensorValue, HandleSetSensorValue, 1, true},
-  {PID_RECORD_SENSORS, NULL, HandleRecordSensor, 0, true},
-  {PID_DEVICE_POWER_CYCLES, HandleGetDevicePowerCycles,
-   HandleSetDevicePowerCycles, 0, true},
-  {PID_IDENTIFY_DEVICE, HandleGetIdentifyDevice, HandleSetIdentifyDevice,
-   0, false},
-  {PID_MANUFACTURER_SET_SERIAL, NULL, HandleSetSerial, 4, true},
+const RDMHandler::pid_definition RDMHandler::PID_DEFINITIONS[] = {
+  {PID_QUEUED_MESSAGE, &RDMHandler::HandleGetQueuedMessage, NULL, 1, true},
+  {PID_SUPPORTED_PARAMETERS, &RDMHandler::HandleGetSupportedParameters, NULL,
+    0, false},
+  {PID_PARAMETER_DESCRIPTION, &RDMHandler::HandleGetParameterDescription, NULL,
+    2, false},
+  {PID_DEVICE_INFO, &RDMHandler::HandleGetDeviceInfo, NULL, 0, false},
+  {PID_PRODUCT_DETAIL_ID_LIST, &RDMHandler::HandleGetProductDetailId, NULL, 0,
+    true},
+  {PID_DEVICE_MODEL_DESCRIPTION, &RDMHandler::HandleGetDeviceModelDescription,
+    NULL, 0, true},
+  {PID_MANUFACTURER_LABEL, &RDMHandler::HandleGetManufacturerLabel, NULL, 0,
+    true},
+  {PID_DEVICE_LABEL, &RDMHandler::HandleGetDeviceLabel,
+    &RDMHandler::HandleSetDeviceLabel, 0, true},
+  {PID_LANGUAGE_CAPABILITIES, &RDMHandler::HandleGetLanguage, NULL, 0, true},
+  {PID_LANGUAGE, &RDMHandler::HandleGetLanguage,
+    &RDMHandler::HandleSetLanguage, 0, true},
+  {PID_SOFTWARE_VERSION_LABEL, &RDMHandler::HandleGetSoftwareVersion, NULL, 0,
+    false},
+  {PID_DMX_PERSONALITY, &RDMHandler::HandleGetPersonality,
+    &RDMHandler::HandleSetPersonality, 0, true},
+  {PID_DMX_PERSONALITY_DESCRIPTION,
+    &RDMHandler::HandleGetPersonalityDescription, NULL, 1, true},
+  {PID_DMX_START_ADDRESS, &RDMHandler::HandleGetStartAddress,
+    &RDMHandler::HandleSetStartAddress, 0, false},
+  {PID_SENSOR_DEFINITION, &RDMHandler::HandleGetSensorDefinition, NULL, 1,
+    true},
+  {PID_SENSOR_VALUE, &RDMHandler::HandleGetSensorValue,
+    &RDMHandler::HandleSetSensorValue, 1, true},
+  {PID_RECORD_SENSORS, NULL, &RDMHandler::HandleRecordSensor, 0, true},
+  {PID_DEVICE_POWER_CYCLES, &RDMHandler::HandleGetDevicePowerCycles,
+    &RDMHandler::HandleSetDevicePowerCycles, 0, true},
+  {PID_IDENTIFY_DEVICE, &RDMHandler::HandleGetIdentifyDevice,
+    &RDMHandler::HandleSetIdentifyDevice, 0, false},
+  {PID_MANUFACTURER_SET_SERIAL, NULL, &RDMHandler::HandleSetSerial, 4, true},
 };
 
 
-// personalities
-typedef struct {
-  byte personality_number;
-  byte slots;
-  const char *description;
-} rdm_personality;
-
-rdm_personality rdm_personalities[] = {
+const RDMHandler::rdm_personality RDMHandler::rdm_personalities[] = {
   {1, 6, "6x PWM"},
   {2, 6, "3x inverted PWM, 3x PWM"},
   {3, 6, "6x inverted PWM"},
 };
 
-// Pin constants
-const byte IDENTIFY_LED_PIN = 12;
-const byte TEMP_SENSOR_PIN = 0;
-
 // Various constants used in RDM messages
-char SUPPORTED_LANGUAGE[] = "en";
-unsigned long SOFTWARE_VERSION = 1;
-char SOFTWARE_VERSION_STRING[] = "1.0";
-const int MAX_DMX_ADDRESS = 512;
-enum { MAX_LABEL_SIZE = 32 };
-const char SET_SERIAL_PID_DESCRIPTION[] = "Set Serial Number";
-const char TEMPERATURE_SENSOR_DESCRIPTION[] = "Case Temperature";
-
-// The identify state
-bool identify_mode_enabled = false;
-
-bool device_label_pending = false;
-bool sent_device_label = false;
-
-// global objects
-RDMSender rdm_sender(&sender);
-
-
-/**
- * Initialize the I/O pins used as part of the RDM responder.
- */
-void SetupRDMHandling() {
-  pinMode(IDENTIFY_LED_PIN, OUTPUT);
-  digitalWrite(IDENTIFY_LED_PIN, identify_mode_enabled);
-}
+const char RDMHandler::SUPPORTED_LANGUAGE[] = "en";
+const char RDMHandler::SOFTWARE_VERSION_STRING[] = "1.0";
+const char RDMHandler::SET_SERIAL_PID_DESCRIPTION[] = "Set Serial Number";
+const char RDMHandler::TEMPERATURE_SENSOR_DESCRIPTION[] = "Case Temperature";
 
 
 /**
@@ -157,7 +83,7 @@ void SetupRDMHandling() {
  * @param size the size of the message data
  * @return true if the checksum is ok, false otherwise
  */
-bool VerifyChecksum(const byte *message, int size) {
+bool RDMHandler::VerifyChecksum(const byte *message, int size) {
   // don't checksum the checksum itself (last two bytes)
   unsigned int checksum = 0;
   for (int i = 0; i < size - 2; i++)
@@ -173,7 +99,7 @@ bool VerifyChecksum(const byte *message, int size) {
  * Read the value of the temperature sensor.
  * @return the temp in degrees C * 10
  */
-int ReadTemperatureSensor() {
+int RDMHandler::ReadTemperatureSensor() {
   // v = input / 1024 * 5 V
   // t = 100 * v
   // we multiple the result by 10
@@ -185,7 +111,7 @@ int ReadTemperatureSensor() {
  * Send a sensor response, this is used for both PID_SENSOR_VALUE &
  * PID_RECORD_SENSORS.
  */
-void SendSensorResponse(const byte *received_message) {
+void RDMHandler::SendSensorResponse(const byte *received_message) {
   rdm_sender.StartRDMAckResponse(received_message, 9);
   rdm_sender.SendByteAndChecksum(received_message[24]);
   rdm_sender.SendIntAndChecksum(ReadTemperatureSensor());  // current
@@ -200,9 +126,9 @@ void SendSensorResponse(const byte *received_message) {
  * Send a RDM message with a string as param data. Used for DEVICE_LABEL,
  * MANUFACTURER_LABEL, etc.
  */
-void HandleStringRequest(const byte *received_message,
-                         char *label,
-                         byte label_size) {
+void RDMHandler::HandleStringRequest(const byte *received_message,
+                                     const char *label,
+                                     byte label_size) {
   rdm_sender.StartRDMResponse(received_message, RDM_RESPONSE_ACK, label_size);
   for (unsigned int i = 0; i < label_size; ++i)
     rdm_sender.SendByteAndChecksum(label[i]);
@@ -213,19 +139,19 @@ void HandleStringRequest(const byte *received_message,
 /**
  * Handle a GET QUEUED_MESSAGE request
  */
-void HandleGetQueuedMessage(const byte *received_message) {
-  if (device_label_pending) {
+void RDMHandler::HandleGetQueuedMessage(const byte *received_message) {
+  if (m_device_label_pending) {
     rdm_sender.DecrementMessageCount();
-    device_label_pending = false;
-    sent_device_label = true;
+    m_device_label_pending = false;
+    m_sent_device_label = true;
     rdm_sender.StartCustomResponse(received_message, RDM_RESPONSE_ACK,
         0, SET_COMMAND_RESPONSE, PID_DEVICE_LABEL);
-  } else if (sent_device_label && received_message[24] ==
+  } else if (m_sent_device_label && received_message[24] ==
              STATUS_GET_LAST_MESSAGE) {
     rdm_sender.StartCustomResponse(received_message, RDM_RESPONSE_ACK,
         0, SET_COMMAND_RESPONSE, PID_DEVICE_LABEL);
   } else {
-    sent_device_label = false;
+    m_sent_device_label = false;
     rdm_sender.StartCustomResponse(received_message, RDM_RESPONSE_ACK,
         0, GET_COMMAND_RESPONSE, PID_STATUS_MESSAGES);
   }
@@ -236,7 +162,7 @@ void HandleGetQueuedMessage(const byte *received_message) {
 /**
  * Handle a GET SUPPORTED_PARAMETERS request
  */
-void HandleGetSupportedParameters(const byte *received_message) {
+void RDMHandler::HandleGetSupportedParameters(const byte *received_message) {
   byte supported_params = 0;
   for (byte i = 0; i < sizeof(PID_DEFINITIONS) / sizeof(pid_definition); ++i) {
     if (PID_DEFINITIONS[i].include_in_supported_params)
@@ -255,7 +181,7 @@ void HandleGetSupportedParameters(const byte *received_message) {
 /**
  * Handle a GET PARAMETER_DESCRIPTION request
  */
-void HandleGetParameterDescription(const byte *received_message) {
+void RDMHandler::HandleGetParameterDescription(const byte *received_message) {
   unsigned int param_id = (((unsigned int) received_message[24] << 8) +
                            received_message[25]);
 
@@ -286,7 +212,7 @@ void HandleGetParameterDescription(const byte *received_message) {
 /**
  * Handle a GET DEVICE_INFO request
  */
-void HandleGetDeviceInfo(const byte *received_message) {
+void RDMHandler::HandleGetDeviceInfo(const byte *received_message) {
   rdm_sender.StartRDMAckResponse(received_message, 19);
   rdm_sender.SendIntAndChecksum(256);  // protocol version
   rdm_sender.SendIntAndChecksum(2);  // device model
@@ -310,7 +236,7 @@ void HandleGetDeviceInfo(const byte *received_message) {
 /**
  * Handle a GET PRODUCT_DETAIL_ID request
  */
-void HandleGetProductDetailId(const byte *received_message) {
+void RDMHandler::HandleGetProductDetailId(const byte *received_message) {
   rdm_sender.StartRDMAckResponse(received_message, 2);
   rdm_sender.SendIntAndChecksum(0x0403);  // PWM dimmer
   rdm_sender.EndRDMResponse();
@@ -320,7 +246,8 @@ void HandleGetProductDetailId(const byte *received_message) {
 /**
  * Handle a GET PID_DEVICE_MODEL_DESCRIPTION request
  */
-void HandleGetDeviceModelDescription(const byte *received_message) {
+void RDMHandler::HandleGetDeviceModelDescription(
+    const byte *received_message) {
   HandleStringRequest(received_message, DEVICE_NAME, DEVICE_NAME_SIZE);
 }
 
@@ -328,7 +255,7 @@ void HandleGetDeviceModelDescription(const byte *received_message) {
 /**
  * Handle a GET MANUFACTURER_NAME request
  */
-void HandleGetManufacturerLabel(const byte *received_message) {
+void RDMHandler::HandleGetManufacturerLabel(const byte *received_message) {
   HandleStringRequest(received_message, MANUFACTURER_NAME,
                       MANUFACTURER_NAME_SIZE);
 }
@@ -337,7 +264,7 @@ void HandleGetManufacturerLabel(const byte *received_message) {
 /**
  * Handle a GET DEVICE_LABEL request
  */
-void HandleGetDeviceLabel(const byte *received_message) {
+void RDMHandler::HandleGetDeviceLabel(const byte *received_message) {
   char device_label[MAX_LABEL_SIZE];
   byte size = WidgetSettings.DeviceLabel(device_label, sizeof(device_label));
   HandleStringRequest(received_message, device_label, size);
@@ -347,7 +274,7 @@ void HandleGetDeviceLabel(const byte *received_message) {
 /**
  * Handle a GET LANGUAGE / LANGUAGE_CAPABILITIES request
  */
-void HandleGetLanguage(const byte *received_message) {
+void RDMHandler::HandleGetLanguage(const byte *received_message) {
   HandleStringRequest(received_message,
                       SUPPORTED_LANGUAGE,
                       sizeof(SUPPORTED_LANGUAGE) - 1);
@@ -357,7 +284,7 @@ void HandleGetLanguage(const byte *received_message) {
 /**
  * Handle a GET SOFTWARE_VERSION_LABEL request
  */
-void HandleGetSoftwareVersion(const byte *received_message) {
+void RDMHandler::HandleGetSoftwareVersion(const byte *received_message) {
   rdm_sender.StartRDMAckResponse(received_message,
                                  sizeof(SOFTWARE_VERSION_STRING));
   for (unsigned int i = 0; i < sizeof(SOFTWARE_VERSION_STRING); ++i)
@@ -369,7 +296,7 @@ void HandleGetSoftwareVersion(const byte *received_message) {
 /**
  * Handle a GET DMX_PERSONALITY request
  */
-void HandleGetPersonality(const byte *received_message) {
+void RDMHandler::HandleGetPersonality(const byte *received_message) {
   rdm_sender.StartRDMAckResponse(received_message, 2);
   rdm_sender.SendByteAndChecksum(WidgetSettings.Personality());
   rdm_sender.SendByteAndChecksum(sizeof(rdm_personalities) /
@@ -381,7 +308,8 @@ void HandleGetPersonality(const byte *received_message) {
 /**
  * Handle a GET DMX_PERSONALITY_DESCRIPTION request
  */
-void HandleGetPersonalityDescription(const byte *received_message) {
+void RDMHandler::HandleGetPersonalityDescription(
+    const byte *received_message) {
   byte max_personalities = sizeof(rdm_personalities) / sizeof(rdm_personality);
   byte personality_number = received_message[24];
 
@@ -390,7 +318,8 @@ void HandleGetPersonalityDescription(const byte *received_message) {
     return;
   }
 
-  rdm_personality *personality = &rdm_personalities[personality_number - 1];
+  rdm_personality const *personality =
+    &rdm_personalities[personality_number - 1];
   unsigned int description_length = strlen(personality->description);
 
   rdm_sender.StartRDMAckResponse(received_message, 3 + description_length);
@@ -405,7 +334,7 @@ void HandleGetPersonalityDescription(const byte *received_message) {
 /**
  * Handle a GET DMX_START_ADDRESS request
  */
-void HandleGetStartAddress(const byte *received_message) {
+void RDMHandler::HandleGetStartAddress(const byte *received_message) {
   int start_address = WidgetSettings.StartAddress();
   rdm_sender.StartRDMAckResponse(received_message, sizeof(start_address));
   rdm_sender.SendIntAndChecksum(start_address);
@@ -416,7 +345,7 @@ void HandleGetStartAddress(const byte *received_message) {
 /**
  * Handle a GET SENSOR_DEFINITION request
  */
-void HandleGetSensorDefinition(const byte *received_message) {
+void RDMHandler::HandleGetSensorDefinition(const byte *received_message) {
   if (received_message[24]) {
     rdm_sender.SendNack(received_message, NR_DATA_OUT_OF_RANGE);
     return;
@@ -443,7 +372,7 @@ void HandleGetSensorDefinition(const byte *received_message) {
 /**
  * Handle a GET SENSOR_VALUE request
  */
-void HandleGetSensorValue(const byte *received_message) {
+void RDMHandler::HandleGetSensorValue(const byte *received_message) {
   if (received_message[24]) {
     rdm_sender.SendNack(received_message, NR_DATA_OUT_OF_RANGE);
     return;
@@ -456,7 +385,7 @@ void HandleGetSensorValue(const byte *received_message) {
 /**
  * Handle a GET DEVICE_POWER_CYCLES request
  */
-void HandleGetDevicePowerCycles(const byte *received_message) {
+void RDMHandler::HandleGetDevicePowerCycles(const byte *received_message) {
   unsigned long power_cycles = WidgetSettings.DevicePowerCycles();
   rdm_sender.StartRDMAckResponse(received_message, sizeof(power_cycles));
   rdm_sender.SendLongAndChecksum(power_cycles);
@@ -467,9 +396,9 @@ void HandleGetDevicePowerCycles(const byte *received_message) {
 /**
  * Handle a GET IDENTIFY_DEVICE request
  */
-void HandleGetIdentifyDevice(const byte *received_message) {
+void RDMHandler::HandleGetIdentifyDevice(const byte *received_message) {
   rdm_sender.StartRDMAckResponse(received_message, 1);
-  rdm_sender.SendByteAndChecksum(identify_mode_enabled);
+  rdm_sender.SendByteAndChecksum(m_identify_mode_enabled);
   rdm_sender.EndRDMResponse();
 }
 
@@ -477,9 +406,9 @@ void HandleGetIdentifyDevice(const byte *received_message) {
 /**
  * Handle a SET DMX_START_ADDRESS request
  */
-void HandleSetLanguage(bool was_broadcast,
-                       int sub_device,
-                       const byte *received_message) {
+void RDMHandler::HandleSetLanguage(bool was_broadcast,
+                                   int sub_device,
+                                   const byte *received_message) {
   // check for invalid size or value
   if (received_message[23] != 2) {
     rdm_sender.NackOrBroadcast(was_broadcast,
@@ -511,9 +440,9 @@ void HandleSetLanguage(bool was_broadcast,
 /**
  * Handle a SET DMX_START_ADDRESS request
  */
-void HandleSetDeviceLabel(bool was_broadcast,
-                          int sub_device,
-                          const byte *received_message) {
+void RDMHandler::HandleSetDeviceLabel(bool was_broadcast,
+                                      int sub_device,
+                                      const byte *received_message) {
   // check for invalid size or value
   if (received_message[23] > MAX_LABEL_SIZE) {
     rdm_sender.NackOrBroadcast(was_broadcast,
@@ -528,9 +457,9 @@ void HandleSetDeviceLabel(bool was_broadcast,
   if (was_broadcast) {
     rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
   } else {
-    // 500ms should be more than enough time
-    rdm_sender.SendAckTimer(received_message, 5);
-    device_label_pending = true;
+    // 400ms should be more than enough time
+    rdm_sender.SendAckTimer(received_message, 4);
+    m_device_label_pending = true;
     rdm_sender.IncrementMessageCount();
   }
 }
@@ -539,9 +468,9 @@ void HandleSetDeviceLabel(bool was_broadcast,
 /**
  * Handle a SET DMX_PERSONALITY request
  */
-void HandleSetPersonality(bool was_broadcast,
-                          int sub_device,
-                          const byte *received_message) {
+void RDMHandler::HandleSetPersonality(bool was_broadcast,
+                                      int sub_device,
+                                      const byte *received_message) {
   // check for invalid size or value
   if (received_message[23] != 1) {
     rdm_sender.NackOrBroadcast(was_broadcast,
@@ -571,9 +500,9 @@ void HandleSetPersonality(bool was_broadcast,
 /**
  * Handle a SET DMX_START_ADDRESS request
  */
-void HandleSetStartAddress(bool was_broadcast,
-                           int sub_device,
-                           const byte *received_message) {
+void RDMHandler::HandleSetStartAddress(bool was_broadcast,
+                                       int sub_device,
+                                       const byte *received_message) {
   // check for invalid size or value
   if (received_message[23] != 2) {
     rdm_sender.NackOrBroadcast(was_broadcast,
@@ -605,9 +534,9 @@ void HandleSetStartAddress(bool was_broadcast,
 /**
  * Handle a SET SENSOR_VALUE request
  */
-void HandleSetSensorValue(bool was_broadcast,
-                          int sub_device,
-                          const byte *received_message) {
+void RDMHandler::HandleSetSensorValue(bool was_broadcast,
+                                      int sub_device,
+                                      const byte *received_message) {
   // check for invalid size or value
   if (received_message[23] != 1) {
     rdm_sender.NackOrBroadcast(was_broadcast,
@@ -629,9 +558,9 @@ void HandleSetSensorValue(bool was_broadcast,
 /*
  * Handle a SET RECORD_SENSORS request
  */
-void HandleRecordSensor(bool was_broadcast,
-                        int sub_device,
-                        const byte *received_message) {
+void RDMHandler::HandleRecordSensor(bool was_broadcast,
+                                    int sub_device,
+                                    const byte *received_message) {
   // check for invalid size or value
   if (received_message[23] != 1) {
     rdm_sender.NackOrBroadcast(was_broadcast,
@@ -659,9 +588,9 @@ void HandleRecordSensor(bool was_broadcast,
 /**
  * Handle a SET DEVICE_POWER_CYCLES request
  */
-void HandleSetDevicePowerCycles(bool was_broadcast,
-                                int sub_device,
-                                const byte *received_message) {
+void RDMHandler::HandleSetDevicePowerCycles(bool was_broadcast,
+                                            int sub_device,
+                                            const byte *received_message) {
   // check for invalid size or value
   if (received_message[23] != 4) {
     rdm_sender.NackOrBroadcast(was_broadcast,
@@ -688,9 +617,9 @@ void HandleSetDevicePowerCycles(bool was_broadcast,
 /**
  * Handle a SET IDENTIFY_DEVICE request
  */
-void HandleSetIdentifyDevice(bool was_broadcast,
-                             int sub_device,
-                             const byte *received_message) {
+void RDMHandler::HandleSetIdentifyDevice(bool was_broadcast,
+                                         int sub_device,
+                                         const byte *received_message) {
   // check for invalid size or value
   if (received_message[23] != 1) {
     rdm_sender.NackOrBroadcast(was_broadcast,
@@ -705,8 +634,8 @@ void HandleSetIdentifyDevice(bool was_broadcast,
     return;
   }
 
-  identify_mode_enabled = received_message[24];
-  digitalWrite(IDENTIFY_LED_PIN, identify_mode_enabled);
+  m_identify_mode_enabled = received_message[24];
+  digitalWrite(IDENTIFY_LED_PIN, m_identify_mode_enabled);
 
   if (was_broadcast) {
     rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
@@ -719,9 +648,9 @@ void HandleSetIdentifyDevice(bool was_broadcast,
 /**
  * Handle a SET SERIAL_NUMBER request
  */
-void HandleSetSerial(bool was_broadcast,
-                     int sub_device,
-                     const byte *received_message) {
+void RDMHandler::HandleSetSerial(bool was_broadcast,
+                                 int sub_device,
+                                 const byte *received_message) {
   if (received_message[23] != 4) {
     rdm_sender.NackOrBroadcast(was_broadcast,
                                received_message,
@@ -758,7 +687,7 @@ void HandleSetSerial(bool was_broadcast,
  * code.
  * @param size the size of the message data.
  */
-void HandleRDMMessage(const byte *message, int size) {
+void RDMHandler::HandleRDMMessage(const byte *message, int size) {
   // check for a packet that is too small, an invalid start / sub start code
   // or a mismatched message length.
   if (size < MINIMUM_RDM_PACKET_SIZE || message[0] != START_CODE ||
@@ -810,7 +739,7 @@ void HandleRDMMessage(const byte *message, int size) {
 
   unsigned int param_id = (message[21] << 8) + message[22];
 
-  pid_definition *pid_handler = NULL;
+  pid_definition const *pid_handler = NULL;
   for (byte i = 0; i < sizeof(PID_DEFINITIONS) / sizeof(pid_definition); ++i) {
     if (PID_DEFINITIONS[i].pid == param_id)
       pid_handler = &PID_DEFINITIONS[i];
@@ -843,7 +772,7 @@ void HandleRDMMessage(const byte *message, int size) {
       return;
     }
 
-    pid_handler->get_handler(message);
+    (this->*(pid_handler->get_handler))(message);
 
   } else  {
     if (!pid_handler->set_handler) {
@@ -852,6 +781,6 @@ void HandleRDMMessage(const byte *message, int size) {
       return;
     }
 
-    pid_handler->set_handler(is_broadcast, sub_device, message);
+    (this->*(pid_handler->set_handler))(is_broadcast, sub_device, message);
   }
 }

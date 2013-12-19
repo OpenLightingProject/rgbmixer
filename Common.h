@@ -21,7 +21,7 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include "WProgram.h"
+#include "Arduino.h"
 #include "UsbProSender.h"
 
 // device constants

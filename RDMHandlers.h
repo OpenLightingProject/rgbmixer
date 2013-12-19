@@ -21,7 +21,7 @@
 #ifndef RDM_HANDLERS_H
 #define RDM_HANDLERS_H
 
-#include "WProgram.h"
+#include "Arduino.h"
 #include "RDMSender.h"
 
 /**

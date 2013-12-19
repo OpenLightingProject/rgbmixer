@@ -17,7 +17,7 @@
  * Copyright (C) 2011 Simon Newton
  */
 
-#include "WProgram.h"
+#include "Arduino.h"
 
 #ifndef USBPRO_SENDER_H
 #define USBPRO_SENDER_H

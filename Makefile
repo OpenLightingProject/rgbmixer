@@ -1,7 +1,12 @@
-# Arduino 0015 Makefile
+# Arduino 1.0 Makefile
+# Based on Arduino 0018 Makefile
+# last updated 12/15/2011, Kerry Wong
+#
 # Arduino adaptation by mellis, eighthave, oli.keller
-# Modified by Johannes Hoff <johannes@johanneshoff.com> to
-# work on linux command line and sort out dependencies.
+#
+# Modified by Kerry Wong to support NetBeans
+# http://www.kerrywong.com
+#
 #
 # This makefile allows you to build sketches from the command line
 # without the Arduino environment (or Java).
@@ -14,7 +19,7 @@
 #
 #  2. Modify the line containg "INSTALL_DIR" to point to the directory that
 #     contains the Arduino installation (for example, under Mac OS X, this
-#     might be /Applications/arduino-0015).
+#     might be /Applications/arduino-0012).
 #
 #  3. Modify the line containing "PORT" to refer to the filename
 #     representing the USB or serial connection to your Arduino board
@@ -33,32 +38,60 @@
 #
 #  7. Type "make upload", reset your Arduino board, and press enter to
 #     upload your program to the Arduino board.
+#
+# $Id$
 
 TARGET = $(notdir $(CURDIR))
+# Change this to match your arduino installation directory
 INSTALL_DIR = /Applications/Arduino.app/Contents/Resources/Java
+#INSTALL_DIR = $(HOME)/arduino-1.0
 PORT = /dev/tty.usbserial-A9007VMx
 UPLOAD_RATE = 57600
 AVRDUDE_PROGRAMMER = stk500
 MCU = atmega328p
 F_CPU = 16000000
-SOURCES = EEPROM.cpp RDMHandlers.cpp RDMSender.cpp UsbProReceiver.cpp \
+SOURCES = RDMHandlers.cpp RDMSender.cpp UsbProReceiver.cpp \
           UsbProSender.cpp WidgetSettings.cpp
 
-############################################################################
-# Below here nothing should be changed...
-
+VERSION=1.0
 ARDUINO = $(INSTALL_DIR)/hardware/arduino/cores/arduino
+VARIANTS = $(INSTALL_DIR)/hardware/arduino/variants/standard
+ARDUINO_LIB = $(INSTALL_DIR)/libraries
 AVR_TOOLS_PATH = $(INSTALL_DIR)/hardware/tools/avr/bin
-AVRDUDE_PATH = $(INSTALL_DIR)/hardware/tools/avr/
-SRC =  $(ARDUINO)/pins_arduino.c $(ARDUINO)/wiring.c \
-$(ARDUINO)/wiring_analog.c $(ARDUINO)/wiring_digital.c \
-$(ARDUINO)/wiring_pulse.c \
-$(ARDUINO)/wiring_shift.c $(ARDUINO)/WInterrupts.c
-CXXSRC = $(ARDUINO)/HardwareSerial.cpp $(ARDUINO)/WMath.cpp \
-$(ARDUINO)/Print.cpp $(ARDUINO)/WString.cpp \
-$(ARDUINO)/Tone.cpp
-FORMAT = ihex
+AVRDUDE_PATH = $(INSTALL_DIR)/hardware/tools/avr/bin
 
+#Note that if your program has dependencies other than those
+#already listed below, you will need to add them accordingly.
+C_MODULES =  \
+$(ARDUINO)/wiring_pulse.c \
+$(ARDUINO)/wiring_analog.c \
+$(ARDUINO)/wiring.c \
+$(ARDUINO)/wiring_digital.c \
+$(ARDUINO)/WInterrupts.c \
+$(ARDUINO)/wiring_shift.c \
+
+CXX_MODULES = \
+$(ARDUINO)/Tone.cpp \
+$(ARDUINO)/WMath.cpp \
+$(ARDUINO)/Print.cpp \
+$(ARDUINO)/HardwareSerial.cpp \
+$(ARDUINO)/CDC.cpp \
+$(ARDUINO)/HID.cpp \
+$(ARDUINO)/IPAddress.cpp \
+$(ARDUINO)/new.cpp \
+$(ARDUINO)/Stream.cpp \
+$(ARDUINO)/USBCore.cpp \
+$(ARDUINO)/WMath.cpp \
+$(ARDUINO)/WString.cpp \
+$(ARDUINO)/main.cpp \
+$(SOURCES) \
+$(ARDUINO_LIB)/EEPROM/EEPROM.cpp \
+
+CXX_APP = main.cpp
+MODULES = $(C_MODULES) $(CXX_MODULES)
+SRC = $(C_MODULES)
+CXXSRC = $(CXX_MODULES) $(CXX_APP)
+FORMAT = ihex
 
 # Name of this Makefile (used for "make depend").
 MAKEFILE = Makefile
@@ -66,105 +99,102 @@ MAKEFILE = Makefile
 # Debugging format.
 # Native formats for AVR-GCC's -g are stabs [default], or dwarf-2.
 # AVR (extended) COFF requires stabs, plus an avr-objcopy run.
-DEBUG = stabs
+#DEBUG = stabs
+DEBUG =
 
 OPT = s
 
 # Place -D or -U options here
-CDEFS = -DF_CPU=$(F_CPU)
-CXXDEFS = -DF_CPU=$(F_CPU)
+CDEFS = -DF_CPU=$(F_CPU)L -DARDUINO=$(VERSION)
+CXXDEFS = -DF_CPU=$(F_CPU)L -DARDUINO=$(VERSION)
 
 # Place -I options here
-CINCS = -I$(ARDUINO)
-CXXINCS = -I$(ARDUINO)
+CINCS = -I$(ARDUINO)  -I$(VARIANTS) -I$(ARDUINO_LIB)
+CXXINCS = -I$(ARDUINO) -I$(VARIANTS) -I$(ARDUINO_LIB)
 
 # Compiler flag to set the C Standard level.
 # c89   - "ANSI" C
 # gnu89 - c89 plus GCC extensions
 # c99   - ISO C99 standard (not yet fully implemented)
 # gnu99 - c99 plus GCC extensions
-CSTANDARD = # -std=gnu99
+#CSTANDARD = -std=gnu99
 CDEBUG = -g$(DEBUG)
-CWARN = -Wall # -Wstrict-prototypes
-CTUNING = -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums
+#CWARN = -Wall -Wstrict-prototypes
+#CWARN = -Wall   # show all warnings
+CWARN = -w #suppress all warnings
+####CTUNING = -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums
+CTUNING = -ffunction-sections -fdata-sections
+CXXTUNING = -fno-exceptions -ffunction-sections -fdata-sections
 #CEXTRA = -Wa,-adhlns=$(<:.c=.lst)
 
-CFLAGS = $(CDEBUG) $(CDEFS) $(CINCS) -O$(OPT) $(CWARN) $(CSTANDARD) $(CEXTRA)
-CXXFLAGS = $(CDEFS) $(CINCS) -O$(OPT)
+CFLAGS = $(CDEBUG) -O$(OPT) $(CWARN) $(CTUNING) $(CDEFS) $(CINCS) $(CSTANDARD) $(CEXTRA)
+CXXFLAGS = $(CDEBUG) -O$(OPT) $(CWARN) $(CXXTUNING) $(CDEFS) $(CINCS)
 #ASFLAGS = -Wa,-adhlns=$(<:.S=.lst),-gstabs
-LDFLAGS = -lm
+LDFLAGS = -O$(OPT) -lm -Wl,--gc-sections
 
 
 # Programming support using avrdude. Settings and variables.
 AVRDUDE_PORT = $(PORT)
-AVRDUDE_WRITE_FLASH = -U flash:w:$(TARGET).hex
-AVRDUDE_FLAGS = -V -F -C $(AVRDUDE_PATH)/etc/avrdude.conf \
+AVRDUDE_WRITE_FLASH = -U flash:w:applet/main.hex
+
+AVRDUDE_FLAGS = -V -F -C $(INSTALL_DIR)/hardware/tools/avr/etc/avrdude.conf \
 -p $(MCU) -P $(AVRDUDE_PORT) -c $(AVRDUDE_PROGRAMMER) \
--b $(UPLOAD_RATE)
+-b $(UPLOAD_RATE) -D
 
 # Program settings
 CC = $(AVR_TOOLS_PATH)/avr-gcc
 CXX = $(AVR_TOOLS_PATH)/avr-g++
+LD = $(AVR_TOOLS_PATH)/avr-gcc
 OBJCOPY = $(AVR_TOOLS_PATH)/avr-objcopy
 OBJDUMP = $(AVR_TOOLS_PATH)/avr-objdump
 AR  = $(AVR_TOOLS_PATH)/avr-ar
 SIZE = $(AVR_TOOLS_PATH)/avr-size
 NM = $(AVR_TOOLS_PATH)/avr-nm
-AVRDUDE = $(AVRDUDE_PATH)/bin/avrdude
+AVRDUDE = $(AVRDUDE_PATH)/avrdude
 REMOVE = rm -f
 MV = mv -f
 
 # Define all object files.
 OBJ = $(SRC:.c=.o) $(CXXSRC:.cpp=.o) $(ASRC:.S=.o)
+OBJ_MODULES = $(C_MODULES:.c=.o) $(CXX_MODULES:.cpp=.o)
 
 # Define all listing files.
 LST = $(ASRC:.S=.lst) $(CXXSRC:.cpp=.lst) $(SRC:.c=.lst)
 
 # Combine all necessary flags and optional flags.
 # Add target processor to flags.
-ALL_CFLAGS = -mmcu=$(MCU) -I. $(CFLAGS)
-ALL_CXXFLAGS = -mmcu=$(MCU) -I. $(CXXFLAGS)
-ALL_ASFLAGS = -mmcu=$(MCU) -I. -x assembler-with-cpp $(ASFLAGS)
-
+ALL_CFLAGS = $(CFLAGS) -mmcu=$(MCU)
+ALL_CXXFLAGS = $(CXXFLAGS) -mmcu=$(MCU)
+ALL_ASFLAGS = -x assembler-with-cpp $(ASFLAGS) -mmcu=$(MCU)
+ALL_LDFLAGS = $(LDFLAGS) -mmcu=$(MCU)
 
 # Default target.
-all: build sizeafter
+all: applet_files build sizeafter
 
 build: elf hex
 
-# Here is the "preprocessing".
-# It creates a .cpp file based with the same name as the .pde file.
-# On top of the new .cpp file comes the WProgram.h header.
-# At the end there is a generic main() function attached.
-# Then the .cpp file will be compiled. Errors during compile will
-# refer to this new, automatically generated, file.
-# Not the original .pde file you actually edit...
-$(TARGET).cpp: $(TARGET).pde
-	echo '#include "WProgram.h"' > $(TARGET).cpp
-	echo 'extern "C" void __cxa_pure_virtual() {}' >> $(TARGET).cpp
-	cat $(TARGET).pde >> $(TARGET).cpp
-	cat $(ARDUINO)/main.cpp >> $(TARGET).cpp
+applet/main.o: 
+	test -d applet || mkdir applet
+	$(CXX) -c $(ALL_CXXFLAGS) main.cpp -o applet/main.o
 
-elf: $(TARGET).elf
-hex: $(TARGET).hex
-eep: $(TARGET).eep
-lss: $(TARGET).lss
-sym: $(TARGET).sym
+elf: applet/main.elf
+hex: applet/main.hex
+eep: applet/main.eep
+lss: applet/main.lss
+sym: applet/main.sym
 
 # Program the device.
-upload: $(TARGET).hex
-	pulsedtr.py $(PORT)
+upload: applet/main.hex
 	$(AVRDUDE) $(AVRDUDE_FLAGS) $(AVRDUDE_WRITE_FLASH)
 
-
-# Display size of file.
-HEXSIZE = $(SIZE) --target=$(FORMAT) $(TARGET).hex
-ELFSIZE = $(SIZE)  $(TARGET).elf
+	# Display size of file.
+HEXSIZE = $(SIZE) --target=$(FORMAT) applet/main.hex
+ELFSIZE = $(SIZE)  applet/main.elf
 sizebefore:
-	@if [ -f $(TARGET).elf ]; then echo; $(HEXSIZE); echo; fi
+	@if [ -f applet/main.elf ]; then echo; echo $(MSG_SIZE_BEFORE); $(HEXSIZE); echo; fi
 
 sizeafter:
-	@if [ -f $(TARGET).elf ]; then echo; $(HEXSIZE); echo; fi
+	@if [ -f applet/main.elf ]; then echo; echo $(MSG_SIZE_AFTER); $(HEXSIZE); echo; fi
 
 
 # Convert ELF to COFF for use in debugging / simulating in AVR Studio or VMLAB.
@@ -175,12 +205,12 @@ COFFCONVERT=$(OBJCOPY) --debugging \
 --change-section-address .eeprom-0x810000
 
 
-coff: $(TARGET).elf
-	$(COFFCONVERT) -O coff-avr $(TARGET).elf $(TARGET).cof
+coff: applet/main.elf
+	$(COFFCONVERT) -O coff-avr applet/main.elf main.cof
 
 
-extcoff: $(TARGET).elf
-	$(COFFCONVERT) -O coff-ext-avr $(TARGET).elf $(TARGET).cof
+extcoff: main.elf
+	$(COFFCONVERT) -O coff-ext-avr applet/main.elf main.cof
 
 
 .SUFFIXES: .elf .hex .eep .lss .sym
@@ -189,8 +219,9 @@ extcoff: $(TARGET).elf
 	$(OBJCOPY) -O $(FORMAT) -R .eeprom $< $@
 
 .elf.eep:
-	-$(OBJCOPY) -j .eeprom --set-section-flags=.eeprom="alloc,load" \
-	--change-section-lma .eeprom=0 -O $(FORMAT) $< $@
+	$(OBJCOPY) -O $(FORMAT) -j .eeprom --set-section-flags=.eeprom="alloc,load" \
+	--no-change-warnings \
+	--change-section-lma .eeprom=0 $< $@
 
 # Create extended listing file from ELF output file.
 .elf.lss:
@@ -201,12 +232,12 @@ extcoff: $(TARGET).elf
 	$(NM) -n $< > $@
 
 # Link: create ELF output file from library.
-$(TARGET).elf: $(TARGET).cpp $(SOURCES) core.a
-	$(CC) $(ALL_CFLAGS) -o $@ $(TARGET).cpp $(SOURCES) -L. core.a $(LDFLAGS)
+#applet/$(TARGET).elf: $(TARGET).pde applet/core.a
+applet/main.elf: applet/main.o applet/core.a
+	$(LD) $(ALL_LDFLAGS) -o $@ applet/main.o applet/core.a
 
-core.a: $(OBJ)
-	@for i in $(OBJ); do echo $(AR) rcs core.a $$i; $(AR) rcs core.a $$i; done
-
+applet/core.a: $(OBJ_MODULES)
+	@for i in $(OBJ_MODULES); do echo $(AR) rcs applet/core.a $$i; $(AR) rcs applet/core.a $$i; done
 
 
 # Compile: create object files from C++ source files.
@@ -228,21 +259,21 @@ core.a: $(OBJ)
 	$(CC) -c $(ALL_ASFLAGS) $< -o $@
 
 
+# Automatic dependencies
+%.d: %.c
+	$(CC) -M $(ALL_CFLAGS) $< | sed "s;$(notdir $*).o:;$*.o $*.d:;" > $@
+
+%.d: %.cpp
+	$(CXX) -M $(ALL_CXXFLAGS) $< | sed "s;$(notdir $*).o:;$*.o $*.d:;" > $@
+
+
 # Target: clean project.
 clean:
-	$(REMOVE) $(TARGET).hex $(TARGET).eep $(TARGET).cof $(TARGET).elf \
-	$(TARGET).map $(TARGET).sym $(TARGET).lss core.a \
+	$(REMOVE) applet/main.hex applet/main.eep applet/main.cof applet/main.elf \
+	applet/main.map applet/main.sym applet/main.o applet/main.lss applet/core.a \
 	$(OBJ) $(LST) $(SRC:.c=.s) $(SRC:.c=.d) $(CXXSRC:.cpp=.s) $(CXXSRC:.cpp=.d)
 
-depend:
-	if grep '^# DO NOT DELETE' $(MAKEFILE) >/dev/null; \
-	then \
-		sed -e '/^# DO NOT DELETE/,$$d' $(MAKEFILE) > \
-			$(MAKEFILE).$$$$ && \
-		$(MV) $(MAKEFILE).$$$$ $(MAKEFILE); \
-	fi
-	echo '# DO NOT DELETE THIS LINE -- make depend depends on it.' \
-		>> $(MAKEFILE); \
-	$(CC) -M -mmcu=$(MCU) $(CDEFS) $(CINCS) $(SRC) $(ASRC) >> $(MAKEFILE)
+.PHONY:	all build elf hex eep lss sym program coff extcoff clean applet_files sizebefore sizeafter
 
-.PHONY:	all build elf hex eep lss sym program coff extcoff clean depend sizebefore sizeafter
+#include $(SRC:.c=.d)
+#include $(CXXSRC:.cpp=.d)

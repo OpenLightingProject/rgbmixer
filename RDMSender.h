@@ -20,9 +20,9 @@
 #ifndef RDM_SENDER_H
 #define RDM_SENDER_H
 
+#include "Arduino.h"
 #include "RDMEnums.h"
 #include "UsbProSender.h"
-#include "WProgram.h"
 
 /**
  * Sends a properly framed RDM message over the serial link

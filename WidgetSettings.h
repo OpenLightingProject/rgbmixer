@@ -17,7 +17,7 @@
  * Copyright (C) 2011 Simon Newton
  */
 
-#include "WProgram.h"
+#include "Arduino.h"
 
 #ifndef WIDGET_SETTINGS_H
 #define WIDGET_SETTINGS_H

@@ -18,7 +18,7 @@
  * Contains the message labels used to identify packets.
  */
 
-#include "WProgram.h"
+#include "Arduino.h"
 
 #ifndef MESSAGE_LABELS_H
 #define MESSAGE_LABELS_H

@@ -18,7 +18,7 @@
  * Various static RDM values.
  */
 
-#include "WProgram.h"
+#include "Arduino.h"
 
 #ifndef RDMENUMS_H
 #define RDMENUMS_H

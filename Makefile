@@ -45,9 +45,9 @@ TARGET = $(notdir $(CURDIR))
 # Change this to match your arduino installation directory
 INSTALL_DIR = /Applications/Arduino.app/Contents/Resources/Java
 #INSTALL_DIR = $(HOME)/arduino-1.0
-PORT = /dev/tty.usbserial-A9007VMx
+PORT = /dev/cu.usbserial-A9007VMx
 UPLOAD_RATE = 57600
-AVRDUDE_PROGRAMMER = stk500
+AVRDUDE_PROGRAMMER = arduino
 MCU = atmega328p
 F_CPU = 16000000
 SOURCES = RDMHandlers.cpp RDMSender.cpp UsbProReceiver.cpp \

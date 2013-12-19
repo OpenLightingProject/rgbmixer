@@ -712,12 +712,18 @@ void RDMHandler::HandleRDMMessage(const byte *message, int size) {
   expected_esta_id  = expected_esta_id << 8;
   expected_esta_id += message[4];
 
-  bool to_us = is_broadcast || (
-    WidgetSettings.MatchesEstaId(message + 3) &&
-    WidgetSettings.MatchesSerialNumber(message + 5));
+  bool to_us = (
+      (expected_esta_id == WidgetSettings.EstaId() &&
+       (WidgetSettings.MatchesSerialNumber(message + 5) ||
+        is_broadcast)) ||
+      (expected_esta_id == 0xffff && is_broadcast));
 
   if (!to_us) {
-    rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_INVALID_DESTINATION);
+    if (is_broadcast) {
+      rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_BROADCAST);
+    } else {
+      rdm_sender.ReturnRDMErrorResponse(RDM_STATUS_INVALID_DESTINATION);
+    }
     return;
   }
 

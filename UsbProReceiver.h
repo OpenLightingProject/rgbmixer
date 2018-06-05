@@ -24,7 +24,7 @@
 #define USBPRO_RECEIVER_H_
 
 /**
- * Recieves a message over the serial link
+ * Receives a message over the serial link
  */
 class UsbProReceiver {
   public:

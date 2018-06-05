@@ -17,7 +17,7 @@
 #     file with the same name as the folder and with the extension .pde
 #     (e.g. foo.pde in the foo/ folder).
 #
-#  2. Modify the line containg "INSTALL_DIR" to point to the directory that
+#  2. Modify the line containing "INSTALL_DIR" to point to the directory that
 #     contains the Arduino installation (for example, under Mac OS X, this
 #     might be /Applications/arduino-0012).
 #

@@ -46,7 +46,7 @@ class UsbProReceiver {
       GOT_DATA_LSB = 3,
       IN_DATA = 4,
       WAITING_FOR_EOM = 5,
-    } recieving_state;
+    } receiving_state;
 };
 
 #endif  // USBPRO_RECEIVER_H_

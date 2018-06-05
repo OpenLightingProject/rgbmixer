@@ -116,7 +116,7 @@ void Idle() {
 }
 
 /*
- * Called when a full message is recieved from the host.
+ * Called when a full message is received from the host.
  * @param label the message label.
  * @param message the array of bytes that make up the message.
  * @param message_size the size of the message.

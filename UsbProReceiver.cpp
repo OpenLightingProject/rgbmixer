@@ -34,7 +34,7 @@ UsbProReceiver::UsbProReceiver(void (*callback)(byte label,
  * Read bytes from host
  */
 void UsbProReceiver::Read() {
-  recieving_state recv_mode = PRE_SOM;
+  receiving_state recv_mode = PRE_SOM;
   byte label = 0;
   unsigned short expected_size = 0;
   unsigned short data_offset = 0;

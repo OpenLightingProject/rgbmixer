@@ -716,7 +716,7 @@ void RDMHandler::HandleRDMMessage(const byte *message, int size) {
       (expected_esta_id == WidgetSettings.EstaId() &&
        (WidgetSettings.MatchesSerialNumber(message + 5) ||
         is_broadcast)) ||
-      (expected_esta_id == 0xffff && is_broadcast));
+      (expected_esta_id == (int)0xffff && is_broadcast));
 
   if (!to_us) {
     if (is_broadcast) {

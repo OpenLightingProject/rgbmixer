@@ -8,6 +8,7 @@ set -e
 CPP_LINT_URL="https://raw.githubusercontent.com/google/styleguide/gh-pages/cpplint/cpplint.py";
 
 SPELLINGBLACKLIST=$(cat <<-BLACKLIST
+      -wholename "./.codespellignore" -or \
       -wholename "./.git/*"
 BLACKLIST
 )
@@ -70,10 +71,10 @@ elif [[ $TASK = 'codespell' ]]; then
       $SPELLINGBLACKLIST \
       \) | xargs")
   # count the number of codespell errors
-  spellingerrors=$(zrun codespell --check-filenames --quiet 2 --regex "[a-zA-Z0-9][\\-'a-zA-Z0-9]+[a-zA-Z0-9]" $spellingfiles 2>&1 | wc -l)
+  spellingerrors=$(zrun codespell --check-filenames --quiet 2 --regex "[a-zA-Z0-9][\\-'a-zA-Z0-9]+[a-zA-Z0-9]" --exclude-file .codespellignore $spellingfiles 2>&1 | wc -l)
   if [[ $spellingerrors -ne 0 ]]; then
     # print the output for info
-    zrun codespell --check-filenames --quiet 2 --regex "[a-zA-Z0-9][\\-'a-zA-Z0-9]+[a-zA-Z0-9]" $spellingfiles
+    zrun codespell --check-filenames --quiet 2 --regex "[a-zA-Z0-9][\\-'a-zA-Z0-9]+[a-zA-Z0-9]" --exclude-file .codespellignore $spellingfiles
     echo "Found $spellingerrors spelling errors via codespell"
     exit 1;
   else

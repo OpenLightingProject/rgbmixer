@@ -25,9 +25,9 @@ env:
 matrix:
   fast_finish: true
   include:
-    - env: BOARD=uno
-    - env: BOARD=diecimilaatmega328
-    - env: BOARD=pro16MHzatmega328
+    - env: BOARD=uno PLATFORMIO_CI_SRC=.
+    - env: BOARD=diecimilaatmega328 PLATFORMIO_CI_SRC=.
+    - env: BOARD=pro16MHzatmega328 PLATFORMIO_CI_SRC=.
 
     - os: linux
       dist: trusty

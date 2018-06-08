@@ -81,5 +81,5 @@ elif [[ $TASK = 'codespell' ]]; then
     echo "Found $spellingerrors spelling errors via codespell"
   fi;
 else
-  platformio ci --lib="." --board=$BOARD
+  platformio ci --lib="." --project-option="lib_ldf_mode=deep" --board=$BOARD
 fi

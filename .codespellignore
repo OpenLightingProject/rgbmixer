@@ -1,0 +1,7 @@
+      PRE_SOM = 0,
+      GOT_SOM = 1,
+  receiving_state recv_mode = PRE_SOM;
+      case PRE_SOM:
+          recv_mode = GOT_SOM;
+      case GOT_SOM:
+        recv_mode = PRE_SOM;

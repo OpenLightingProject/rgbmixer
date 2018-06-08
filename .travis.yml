@@ -25,7 +25,9 @@ env:
 matrix:
   fast_finish: true
   include:
-    - env: BOARD=teensylc PLATFORMIO_CI_SRC=examples/DimmerWithMaster
+    - env: BOARD=uno
+    - env: BOARD=diecimilaatmega328
+    - env: BOARD=pro16MHzatmega328
 
     - os: linux
       dist: trusty

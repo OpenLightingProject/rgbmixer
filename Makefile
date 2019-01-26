@@ -54,8 +54,12 @@ SOURCES = RDMHandlers.cpp RDMSender.cpp UsbProReceiver.cpp \
           UsbProSender.cpp WidgetSettings.cpp
 
 VERSION=1.0
-ARDUINO = $(INSTALL_DIR)/hardware/arduino/cores/arduino
-VARIANTS = $(INSTALL_DIR)/hardware/arduino/variants/standard
+# For earlier versions of Arduino, you may need to drop the /avr from the end
+# of this path
+ARDUINO_BASE = $(INSTALL_DIR)/hardware/arduino/avr
+ARDUINO = $(ARDUINO_BASE)/cores/arduino
+ARDUINO_CORE_LIB = $(ARDUINO_BASE)/libraries
+VARIANTS = $(ARDUINO_BASE)/variants/standard
 ARDUINO_LIB = $(INSTALL_DIR)/libraries
 AVR_TOOLS_PATH = $(INSTALL_DIR)/hardware/tools/avr/bin
 AVRDUDE_PATH = $(INSTALL_DIR)/hardware/tools/avr/bin
@@ -75,8 +79,9 @@ $(ARDUINO)/Tone.cpp \
 $(ARDUINO)/WMath.cpp \
 $(ARDUINO)/Print.cpp \
 $(ARDUINO)/HardwareSerial.cpp \
+$(ARDUINO)/HardwareSerial0.cpp \
 $(ARDUINO)/CDC.cpp \
-$(ARDUINO)/HID.cpp \
+$(ARDUINO_CORE_LIB)/HID/src/HID.cpp \
 $(ARDUINO)/IPAddress.cpp \
 $(ARDUINO)/new.cpp \
 $(ARDUINO)/Stream.cpp \
@@ -85,7 +90,6 @@ $(ARDUINO)/WMath.cpp \
 $(ARDUINO)/WString.cpp \
 $(ARDUINO)/main.cpp \
 $(SOURCES) \
-$(ARDUINO_LIB)/EEPROM/EEPROM.cpp \
 
 CXX_APP = main.cpp
 MODULES = $(C_MODULES) $(CXX_MODULES)
@@ -109,8 +113,8 @@ CDEFS = -DF_CPU=$(F_CPU)L -DARDUINO=$(VERSION)
 CXXDEFS = -DF_CPU=$(F_CPU)L -DARDUINO=$(VERSION)
 
 # Place -I options here
-CINCS = -I$(ARDUINO)  -I$(VARIANTS) -I$(ARDUINO_LIB)
-CXXINCS = -I$(ARDUINO) -I$(VARIANTS) -I$(ARDUINO_LIB)
+CINCS = -I$(ARDUINO)  -I$(VARIANTS) -I$(ARDUINO_CORE_LIB) -I$(ARDUINO_LIB)
+CXXINCS = -I$(ARDUINO) -I$(VARIANTS) -I$(ARDUINO_CORE_LIB) -I$(ARDUINO_LIB)
 
 # Compiler flag to set the C Standard level.
 # c89   - "ANSI" C

@@ -1,6 +1,6 @@
 
 To build this software you need the Arduino build environment from
-http://arduino.cc/en/Main/Software. The last tested version was 0022.
+http://arduino.cc/en/Main/Software. The last tested version was 1.8.2.
 
 Edit the INSTALL_DIR variable in the Makefile to point at the Arduino
 installation directory. The software can then be built by running
